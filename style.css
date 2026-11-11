@@ -436,14 +436,6 @@ button {
     box-shadow: 0 0 20px rgba(0,200,255,.35);
 }
 
-.gas-button {
-    width: 88px;
-    height: 78px;
-    color: var(--blue);
-    border-color: var(--blue);
-    font-size: 12px;
-}
-
 .nitro-button { color: #65baff; }
 .drift-button { color: #ff9b7d; border-color: #b65b54; }
 
@@ -501,12 +493,6 @@ button {
     -webkit-tap-highlight-color: transparent;
 }
 
-.gas-button {
-    width: 105px;
-    height: 94px;
-    font-size: 13px;
-}
-
 .steer-group,
 .drive-group {
     bottom: max(25px, env(safe-area-inset-bottom));
@@ -534,11 +520,6 @@ button {
         border-radius: 14px;
     }
 
-    .gas-button {
-        width: 116px;
-        height: 104px;
-        font-size: 14px;
-    }
 
     .steer-group,
     .drive-group {
@@ -562,10 +543,6 @@ button {
         font-size: 16px;
     }
 
-    .gas-button {
-        width: 128px;
-        height: 112px;
-    }
 
     .steer-group,
     .drive-group {
@@ -581,11 +558,6 @@ button {
         font-size: 11px;
     }
 
-    .gas-button {
-        width: 80px;
-        height: 76px;
-        font-size: 9px;
-    }
 
     .steer-group,
     .drive-group {
@@ -604,4 +576,73 @@ button {
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
+}
+
+/* =================================
+   NIGHTSHIFT — THROTTLE & NITRO
+================================= */
+
+.throttle-control {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 65px;
+    height: 115px;
+}
+
+.throttle-control input {
+    appearance: none;
+    -webkit-appearance: none;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 34px;
+    height: 85px;
+    background: rgba(3,13,28,.85);
+    border: 1px solid var(--blue);
+    border-radius: 10px;
+    touch-action: none;
+}
+
+.throttle-control input::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 32px;
+    height: 19px;
+    background: var(--blue);
+    border-radius: 5px;
+    box-shadow: 0 0 12px var(--blue);
+}
+
+.throttle-control input::-moz-range-thumb {
+    width: 32px;
+    height: 19px;
+    background: var(--blue);
+    border: 0;
+    border-radius: 5px;
+}
+
+.throttle-control label {
+    font: 800 9px Orbitron;
+    color: var(--blue);
+    letter-spacing: 1px;
+}
+
+.nitro-button.active {
+    background: rgba(0,150,230,.65);
+    border-color: #00eaff;
+    color: #00eaff;
+    box-shadow: 0 0 22px rgba(0,200,255,.55);
+}
+
+@media (max-width: 650px) {
+    .throttle-control {
+        width: 55px;
+        height: 105px;
+    }
+
+    .throttle-control input {
+        height: 76px;
+    }
 }
