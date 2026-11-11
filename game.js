@@ -1,178 +1,182 @@
 
 import * as THREE from 'three';
-import { TRACK, createWorld } from './world.js';
+import { createWorld } from './world.js';
 import { createVehicle } from './vehicle.js';
 
-// NIGHTSHIFT//LITE — HIGHWAY CONTROLLER
-
 const $ = id => document.getElementById(id);
-const root = $('world');
 
 const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050812);
+scene.fog = new THREE.FogExp2(0x07101e, 0.0018);
 
 const camera = new THREE.PerspectiveCamera(
-    68, innerWidth / innerHeight, 0.1, 900
+    68,
+    innerWidth / innerHeight,
+    0.1,
+    1200
 );
 
 const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: false,
+    alpha: false,
     powerPreference: 'high-performance'
 });
 
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setPixelRatio(1);
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.25;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMappingExposure = 1.15;
+renderer.shadowMap.enabled = false;
 
-root.appendChild(renderer.domElement);
+$('world').appendChild(renderer.domElement);
 
-// World and car
-createWorld(scene);
+// --------------------------------------------------
+// LIGHTING
+// --------------------------------------------------
 
-const vehicle = createVehicle(scene, TRACK);
-const car = vehicle.car;
+scene.add(new THREE.HemisphereLight(
+    0x7899cc,
+    0x080b18,
+    1.5
+));
 
-const clock = new THREE.Clock();
+const moonLight = new THREE.DirectionalLight(
+    0x9dbbff,
+    1.0
+);
+
+moonLight.position.set(-80, 150, 80);
+moonLight.castShadow = false;
+scene.add(moonLight);
+
+// --------------------------------------------------
+// WORLD + VEHICLE
+// --------------------------------------------------
+
+const { track } = createWorld(scene);
+const vehicle = createVehicle(scene, track);
+
+// --------------------------------------------------
+// GAME STATE
+// --------------------------------------------------
+
+let running = false;
+let paused = false;
+let elapsed = 0;
+let distance = 0;
+let lastTime = 0;
+let countdown = 3;
+let countdownActive = false;
 
 const input = {
-    gas: false,
-    brake: false,
     left: false,
     right: false,
+    gas: false,
+    brake: false,
     drift: false,
     nitro: false
 };
 
-let started = false;
-let paused = false;
-let raceTime = 0;
-let cameraShake = 0;
-let smokeTimer = 0;
-let countdownActive = false;
+let bestTime = Number(localStorage.getItem('nightshift_best') || 0);
 
-const cameraTarget = new THREE.Vector3();
-const desiredCamera = new THREE.Vector3();
+// --------------------------------------------------
+// PARTICLES — SMALL PERFORMANCE-FRIENDLY POOL
+// --------------------------------------------------
 
-// =============================================
-// INPUT
-// =============================================
+const PARTICLE_COUNT = 18;
+const particles = [];
 
-const keyMap = {
-    KeyW: 'gas',
-    ArrowUp: 'gas',
-    KeyS: 'brake',
-    ArrowDown: 'brake',
-    KeyA: 'left',
-    ArrowLeft: 'left',
-    KeyD: 'right',
-    ArrowRight: 'right',
-    Space: 'drift',
-    ShiftLeft: 'nitro',
-    ShiftRight: 'nitro'
-};
-
-window.addEventListener('keydown', event => {
-    const action = keyMap[event.code];
-
-    if (action) {
-        event.preventDefault();
-        input[action] = true;
-    }
-
-    if (event.code === 'Escape' && started) {
-        togglePause();
-    }
+const particleGeometry = new THREE.SphereGeometry(0.11, 5, 5);
+const particleMaterial = new THREE.MeshBasicMaterial({
+    color: 0x8aaaff,
+    transparent: true,
+    opacity: 0.55
 });
 
-window.addEventListener('keyup', event => {
-    const action = keyMap[event.code];
+for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const mesh = new THREE.Mesh(
+        particleGeometry,
+        particleMaterial
+    );
 
-    if (action) {
-        event.preventDefault();
-        input[action] = false;
-    }
-});
+    mesh.visible = false;
+    scene.add(mesh);
 
-function clearInput() {
-    Object.keys(input).forEach(key => {
-        input[key] = false;
-    });
-
-    document.querySelectorAll('[data-control]').forEach(button => {
-        button.classList.remove('active');
+    particles.push({
+        mesh,
+        velocity: new THREE.Vector3(),
+        life: 0
     });
 }
 
-window.addEventListener('blur', clearInput);
+let particleIndex = 0;
 
-document.querySelectorAll('[data-control]').forEach(button => {
-    const action = button.dataset.control;
+function emitSmoke(position) {
+    const particle = particles[particleIndex];
 
-    const down = event => {
-        event.preventDefault();
+    particleIndex = (particleIndex + 1) % PARTICLE_COUNT;
 
-        if (paused || !started) return;
+    particle.mesh.position.copy(position);
+    particle.mesh.position.y += 0.3;
 
-        input[action] = true;
-        button.classList.add('active');
+    particle.velocity.set(
+        (Math.random() - 0.5) * 1.2,
+        Math.random() * 0.7,
+        Math.random() * 1.2
+    );
 
-        try {
-            button.setPointerCapture(event.pointerId);
-        } catch (_) {}
-    };
+    particle.life = 0.65;
+    particle.mesh.visible = true;
+}
 
-    const up = event => {
-        event.preventDefault();
-        input[action] = false;
-        button.classList.remove('active');
-    };
+function updateParticles(delta) {
+    for (const particle of particles) {
+        if (particle.life <= 0) continue;
 
-    button.addEventListener('pointerdown', down);
-    button.addEventListener('pointerup', up);
-    button.addEventListener('pointercancel', up);
-    button.addEventListener('lostpointercapture', up);
-});
+        particle.life -= delta;
 
-// =============================================
+        particle.mesh.position.addScaledVector(
+            particle.velocity,
+            delta
+        );
+
+        particle.mesh.scale.multiplyScalar(1 + delta * 1.1);
+
+        if (particle.life <= 0) {
+            particle.mesh.visible = false;
+            particle.mesh.scale.setScalar(1);
+        }
+    }
+}
+
+// --------------------------------------------------
 // AUDIO
-// =============================================
+// --------------------------------------------------
 
-let audioContext;
-let engineOscillator;
-let engineGain;
-let engineFilter;
+let audioContext = null;
+let engineOscillator = null;
+let engineGain = null;
 
 function startAudio() {
+    if (audioContext) {
+        audioContext.resume();
+        return;
+    }
+
     try {
-        const AudioContextClass =
-            window.AudioContext || window.webkitAudioContext;
-
-        if (!AudioContextClass) return;
-
-        if (audioContext) {
-            audioContext.resume();
-            return;
-        }
-
-        audioContext = new AudioContextClass();
+        audioContext = new (
+            window.AudioContext || window.webkitAudioContext
+        )();
 
         engineOscillator = audioContext.createOscillator();
         engineGain = audioContext.createGain();
-        engineFilter = audioContext.createBiquadFilter();
 
         engineOscillator.type = 'sawtooth';
-        engineOscillator.frequency.value = 45;
+        engineOscillator.frequency.value = 55;
+        engineGain.gain.value = 0.025;
 
-        engineFilter.type = 'lowpass';
-        engineFilter.frequency.value = 250;
-
-        engineGain.gain.value = 0.0001;
-
-        engineOscillator.connect(engineFilter);
-        engineFilter.connect(engineGain);
+        engineOscillator.connect(engineGain);
         engineGain.connect(audioContext.destination);
 
         engineOscillator.start();
@@ -181,418 +185,346 @@ function startAudio() {
     }
 }
 
-function updateAudio() {
+function updateAudio(speed) {
     if (!audioContext || !engineOscillator) return;
 
-    const state = vehicle.state;
-
     engineOscillator.frequency.setTargetAtTime(
-        42 + Math.abs(state.speed) * 2.4,
+        45 + speed * 2.2,
         audioContext.currentTime,
         0.08
     );
-
-    const volume = started && !paused
-        ? 0.025 + Math.abs(state.speed) * 0.00035
-        : 0.0001;
-
-    engineGain.gain.setTargetAtTime(
-        volume,
-        audioContext.currentTime,
-        0.1
-    );
-
-    engineFilter.frequency.setTargetAtTime(
-        state.boosting ? 1000 : 400,
-        audioContext.currentTime,
-        0.1
-    );
 }
 
-// =============================================
-// DRIFT PARTICLES
-// =============================================
+// --------------------------------------------------
+// INPUT
+// --------------------------------------------------
 
-const particles = [];
-
-for (let i = 0; i < 35; i++) {
-    const material = new THREE.MeshBasicMaterial({
-        color: 0xb7d6e8,
-        transparent: true,
-        opacity: 0.32,
-        depthWrite: false
-    });
-
-    const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.2, 6, 6),
-        material
-    );
-
-    mesh.visible = false;
-    scene.add(mesh);
-
-    particles.push({
-        mesh,
-        life: 0,
-        maxLife: 1
-    });
+function setInput(key, value) {
+    if (key in input) input[key] = value;
 }
 
-let particleIndex = 0;
+window.addEventListener('keydown', event => {
+    const key = event.key.toLowerCase();
 
-function spawnSmoke() {
-    const state = vehicle.state;
+    if (key === 'arrowleft' || key === 'a') setInput('left', true);
+    if (key === 'arrowright' || key === 'd') setInput('right', true);
+    if (key === 'arrowup' || key === 'w') setInput('gas', true);
+    if (key === 'arrowdown' || key === 's') setInput('brake', true);
+    if (key === ' ') setInput('drift', true);
+    if (key === 'shift') setInput('nitro', true);
+});
 
-    if (!state.drifting || Math.abs(state.speed) < 12) return;
+window.addEventListener('keyup', event => {
+    const key = event.key.toLowerCase();
 
-    for (const side of [-1, 1]) {
-        const p = particles[particleIndex];
+    if (key === 'arrowleft' || key === 'a') setInput('left', false);
+    if (key === 'arrowright' || key === 'd') setInput('right', false);
+    if (key === 'arrowup' || key === 'w') setInput('gas', false);
+    if (key === 'arrowdown' || key === 's') setInput('brake', false);
+    if (key === ' ') setInput('drift', false);
+    if (key === 'shift') setInput('nitro', false);
+});
 
-        particleIndex = (particleIndex + 1) % particles.length;
+// Touch controls
+document.querySelectorAll('[data-control]').forEach(button => {
+    const control = button.dataset.control;
 
-        const offset = new THREE.Vector3(
-            side * 0.9, 0.35, 1.35
-        ).applyQuaternion(car.quaternion);
+    const press = event => {
+        event.preventDefault();
+        setInput(control, true);
+        button.classList.add('active');
 
-        p.mesh.position.copy(car.position).add(offset);
-        p.mesh.scale.setScalar(0.5 + Math.random() * 0.5);
-        p.mesh.visible = true;
-        p.life = 0.65;
-        p.maxLife = 0.65;
-    }
-}
-
-function updateParticles(delta) {
-    for (const p of particles) {
-        if (!p.mesh.visible) continue;
-
-        p.life -= delta;
-
-        if (p.life <= 0) {
-            p.mesh.visible = false;
-            continue;
+        if (button.setPointerCapture && event.pointerId !== undefined) {
+            try {
+                button.setPointerCapture(event.pointerId);
+            } catch {}
         }
+    };
 
-        p.mesh.position.y += delta * 1.1;
-        p.mesh.scale.multiplyScalar(1 + delta * 1.2);
-        p.mesh.material.opacity =
-            0.32 * p.life / p.maxLife;
-    }
-}
+    const release = event => {
+        event.preventDefault();
+        setInput(control, false);
+        button.classList.remove('active');
+    };
 
-// =============================================
+    button.addEventListener('pointerdown', press, { passive: false });
+    button.addEventListener('pointerup', release, { passive: false });
+    button.addEventListener('pointercancel', release, { passive: false });
+    button.addEventListener('lostpointercapture', release);
+});
+
+window.addEventListener('blur', () => {
+    Object.keys(input).forEach(key => input[key] = false);
+});
+
+// --------------------------------------------------
 // CAMERA
-// =============================================
+// --------------------------------------------------
+
+const cameraOffset = new THREE.Vector3(0, 5.1, 10.5);
+const cameraTarget = new THREE.Vector3();
 
 function updateCamera(delta) {
-    const state = vehicle.state;
-    const speedFactor = Math.abs(state.speed) / 65;
+    const car = vehicle.car || vehicle.mesh || vehicle;
 
-    const offset = new THREE.Vector3(
-        0,
-        5.1 + speedFactor * 1.3,
-        10.5 + speedFactor * 2.8
-    );
-
-    offset.applyQuaternion(car.quaternion);
-    desiredCamera.copy(car.position).add(offset);
-
-    cameraShake = THREE.MathUtils.damp(
-        cameraShake,
-        state.boosting ? 0.09 : 0,
-        5,
-        delta
-    );
-
-    desiredCamera.x += (Math.random() - 0.5) * cameraShake;
-    desiredCamera.y += (Math.random() - 0.5) * cameraShake;
+    const targetPosition = cameraOffset
+        .clone()
+        .applyQuaternion(car.quaternion)
+        .add(car.position);
 
     camera.position.lerp(
-        desiredCamera,
-        1 - Math.exp(-5 * delta)
+        targetPosition,
+        1 - Math.pow(0.001, delta)
     );
 
     cameraTarget.copy(car.position);
-    cameraTarget.y += 1;
+    cameraTarget.y += 1.2;
 
     camera.lookAt(cameraTarget);
-
-    const targetFov = state.boosting
-        ? 82
-        : 68 + speedFactor * 6;
-
-    camera.fov = THREE.MathUtils.damp(
-        camera.fov, targetFov, 3, delta
-    );
-
-    camera.updateProjectionMatrix();
 }
 
-// =============================================
-// DISTANCE / HUD
-// =============================================
+// --------------------------------------------------
+// HUD
+// --------------------------------------------------
+
+let hudTimer = 0;
+
+function updateHUD(speed) {
+    hudTimer += 1;
+
+    // Update text less frequently to reduce layout work.
+    if (hudTimer % 4 !== 0) return;
+
+    if ($('speed')) $('speed').textContent = Math.round(speed);
+    if ($('gear')) $('gear').textContent = speed < 5 ? '1' : String(
+        Math.min(6, Math.floor(speed / 35) + 1)
+    );
+
+    if ($('lap')) {
+        $('lap').textContent = (distance / 1000).toFixed(2) + ' KM';
+    }
+
+    if ($('checkpoint')) {
+        $('checkpoint').textContent =
+            vehicle.onRoad === false ? 'OFF ROAD' : 'HIGHWAY';
+    }
+
+    if ($('speed-fill')) {
+        $('speed-fill').style.width =
+            Math.min(100, speed / 220 * 100) + '%';
+    }
+
+    if ($('nitro-fill')) {
+        const nitro = vehicle.nitro ?? 100;
+        $('nitro-fill').style.width = nitro + '%';
+    }
+
+    if ($('nitro-percent')) {
+        $('nitro-percent').textContent =
+            Math.round(vehicle.nitro ?? 100) + '%';
+    }
+
+    if ($('timer')) {
+        $('timer').textContent = formatTime(elapsed);
+    }
+
+    if ($('driving-mode')) {
+        $('driving-mode').textContent =
+            input.drift ? 'DRIFT' :
+            input.nitro ? 'NITRO' : 'CRUISE';
+    }
+}
 
 function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    const hundredths = Math.floor((seconds % 1) * 100);
+    const secs = (seconds % 60).toFixed(2);
 
-    return (
-        String(minutes).padStart(2, '0') + ':' +
-        String(secs).padStart(2, '0') + '.' +
-        String(hundredths).padStart(2, '0')
-    );
+    return String(minutes).padStart(2, '0') + ':' +
+        String(secs).padStart(5, '0');
 }
 
-function updateHUD() {
-    const state = vehicle.state;
-    const kmh = Math.round(Math.abs(state.speed) * 3.6);
-    const distanceKm = state.distance / 1000;
+// --------------------------------------------------
+// MINIMAP
+// --------------------------------------------------
 
-    $('speed').textContent =
-        String(kmh).padStart(3, '0');
+const minimap = $('minimap');
 
-    $('speed-fill').style.width =
-        Math.min(kmh / 274 * 100, 100) + '%';
-
-    $('nitro-fill').style.width =
-        state.nitro + '%';
-
-    $('nitro-percent').textContent =
-        Math.round(state.nitro) + '%';
-
-    const gear = state.speed < -0.5
-        ? 'R'
-        : state.speed < 1
-            ? 'N'
-            : Math.min(7, Math.ceil(state.speed / 9));
-
-    $('gear').textContent = gear;
-
-    $('driving-mode').textContent =
-        state.boosting ? 'BOOST' :
-        state.drifting ? 'DRIFT' :
-        state.onRoad ? 'HIGHWAY' : 'OFF ROAD';
-
-    $('timer').textContent = formatTime(raceTime);
-
-    // Reuse the existing HUD fields for distance and road status.
-    $('lap').innerHTML =
-        distanceKm.toFixed(2) + ' <span>KM</span>';
-
-    $('checkpoint').innerHTML =
-        state.onRoad ? 'ON ROAD' : 'OFF ROAD';
+if (minimap) {
+    minimap.width = 120;
+    minimap.height = 180;
 }
 
-// =============================================
-// HIGHWAY MINIMAP
-// =============================================
-
-const map = $('minimap');
-const ctx = map.getContext('2d');
+const mapCtx = minimap?.getContext('2d');
 
 function drawMinimap() {
-    const w = map.width;
-    const h = map.height;
+    if (!mapCtx) return;
 
-    ctx.clearRect(0, 0, w, h);
-    ctx.save();
+    mapCtx.clearRect(0, 0, 120, 180);
 
-    ctx.translate(w / 2, h / 2);
+    mapCtx.fillStyle = '#07101d';
+    mapCtx.fillRect(0, 0, 120, 180);
 
-    // Straight highway symbol.
-    ctx.fillStyle = '#1b304b';
-    ctx.fillRect(-15, -h / 2, 30, h);
+    mapCtx.strokeStyle = '#263d5a';
+    mapCtx.lineWidth = 30;
+    mapCtx.beginPath();
+    mapCtx.moveTo(60, 0);
+    mapCtx.lineTo(60, 180);
+    mapCtx.stroke();
 
-    ctx.fillStyle = '#5bcfff';
-    ctx.fillRect(-1, -h / 2, 2, h);
+    mapCtx.strokeStyle = '#7aaaff';
+    mapCtx.lineWidth = 1;
+    mapCtx.setLineDash([8, 8]);
+    mapCtx.beginPath();
+    mapCtx.moveTo(60, 0);
+    mapCtx.lineTo(60, 180);
+    mapCtx.stroke();
+    mapCtx.setLineDash([]);
 
-    ctx.strokeStyle = '#d9eaff';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([7, 7]);
-    ctx.beginPath();
-    ctx.moveTo(0, -h / 2);
-    ctx.lineTo(0, h / 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Car marker.
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = '#00dfff';
-    ctx.fillStyle = '#ffffff';
-
-    ctx.beginPath();
-    ctx.moveTo(0, -8);
-    ctx.lineTo(-6, 6);
-    ctx.lineTo(6, 6);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.restore();
+    mapCtx.fillStyle = '#ffffff';
+    mapCtx.beginPath();
+    mapCtx.arc(60, 125, 5, 0, Math.PI * 2);
+    mapCtx.fill();
 }
 
-// =============================================
-// TOAST
-// =============================================
+// --------------------------------------------------
+// GAME FLOW
+// --------------------------------------------------
 
-let toastTimeout;
+function startGame() {
+    if (running) return;
 
-function toast(message) {
-    const element = $('toast');
-
-    element.textContent = message;
-    element.style.opacity = '1';
-
-    clearTimeout(toastTimeout);
-
-    toastTimeout = setTimeout(() => {
-        element.style.opacity = '0';
-    }, 1300);
-}
-
-// =============================================
-// COUNTDOWN
-// =============================================
-
-function startCountdown() {
-    if (countdownActive) return;
-
+    running = true;
+    paused = false;
+    elapsed = 0;
+    distance = 0;
+    countdown = 3;
     countdownActive = true;
 
-    const element = $('countdown');
-    element.classList.remove('hidden');
+    startAudio();
 
-    const sequence = ['3', '2', '1', 'GO!'];
-    let index = 0;
+    if ($('start-screen')) $('start-screen').classList.add('hidden');
+    if ($('finish-screen')) $('finish-screen').classList.add('hidden');
+    if ($('countdown')) $('countdown').classList.remove('hidden');
 
-    function next() {
-        if (index >= sequence.length) {
-            element.classList.add('hidden');
-            started = true;
-            countdownActive = false;
-            return;
-        }
-
-        element.textContent = sequence[index];
-
-        toast(sequence[index] === 'GO!'
-            ? 'HIGHWAY OPEN'
-            : 'GET READY'
-        );
-
-        index++;
-        setTimeout(next, 850);
-    }
-
-    next();
+    lastTime = performance.now();
 }
 
-// =============================================
-// PAUSE / RESTART
-// =============================================
-
-function togglePause() {
-    if (!started) return;
+function pauseGame() {
+    if (!running) return;
 
     paused = !paused;
-    clearInput();
 
-    $('pause-button').textContent = paused ? '▶' : 'Ⅱ';
-
-    toast(paused ? 'DRIVE PAUSED' : 'DRIVE RESUMED');
+    if ($('pause-button')) {
+        $('pause-button').textContent = paused ? 'RESUME' : 'PAUSE';
+    }
 }
 
-$('pause-button').addEventListener('click', togglePause);
+function finishGame() {
+    running = false;
+    paused = false;
 
-$('start-button').addEventListener('click', () => {
-    $('start-screen').classList.add('hidden');
-    startAudio();
-    startCountdown();
-});
+    if ($('final-time')) $('final-time').textContent = formatTime(elapsed);
 
-$('restart-button').addEventListener('click', () => {
+    if (!bestTime || elapsed < bestTime) {
+        bestTime = elapsed;
+        localStorage.setItem('nightshift_best', bestTime);
+    }
+
+    if ($('best-time')) {
+        $('best-time').textContent = formatTime(bestTime);
+    }
+
+    if ($('finish-screen')) $('finish-screen').classList.remove('hidden');
+}
+
+$('start-button')?.addEventListener('click', startGame);
+$('restart-button')?.addEventListener('click', () => {
     location.reload();
 });
+$('pause-button')?.addEventListener('click', pauseGame);
 
-// =============================================
+// --------------------------------------------------
 // MAIN LOOP
-// =============================================
+// --------------------------------------------------
 
-function animate() {
+function animate(now) {
     requestAnimationFrame(animate);
 
-    const delta = Math.min(clock.getDelta(), 0.04);
+    let delta = (now - lastTime) / 1000;
+    lastTime = now;
 
-    if (started && !paused) {
-        raceTime += delta;
+    // Prevent huge physics jumps after a background pause.
+    delta = Math.min(delta, 0.04);
 
-        vehicle.update(delta, input);
+    if (running && !paused) {
+        if (countdownActive) {
+            countdown -= delta;
 
-        smokeTimer += delta;
+            if ($('countdown')) {
+                $('countdown').textContent =
+                    Math.max(1, Math.ceil(countdown));
+            }
 
-        if (smokeTimer > 0.055) {
-            smokeTimer = 0;
-            spawnSmoke();
+            if (countdown <= 0) {
+                countdownActive = false;
+                if ($('countdown')) $('countdown').classList.add('hidden');
+            }
+        } else {
+            elapsed += delta;
+
+            const previousPosition = vehicle.car
+                ? vehicle.car.position.clone()
+                : null;
+
+            vehicle.update(delta, input);
+
+            const car = vehicle.car || vehicle.mesh || vehicle;
+
+            if (previousPosition && car.position) {
+                distance += previousPosition.distanceTo(car.position);
+            }
+
+            const speed = vehicle.speed || 0;
+
+            updateAudio(speed);
+            updateHUD(speed);
+
+            if (input.drift && Math.random() < 0.22) {
+                const smokePosition = car.position.clone();
+                smokePosition.x += (Math.random() - 0.5) * 2;
+                emitSmoke(smokePosition);
+            }
         }
-
-        updateParticles(delta);
-        updateCamera(delta);
-        updateHUD();
-        drawMinimap();
-        updateAudio();
-    } else {
-        updateParticles(delta);
-        updateCamera(delta);
-        drawMinimap();
-        updateAudio();
     }
+
+    updateParticles(delta);
+    updateCamera(delta);
+    drawMinimap();
 
     renderer.render(scene, camera);
 }
 
-animate();
+requestAnimationFrame(animate);
 
-// =============================================
+// --------------------------------------------------
 // RESIZE
-// =============================================
+// --------------------------------------------------
 
 window.addEventListener('resize', () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
 
+    renderer.setPixelRatio(1);
     renderer.setSize(innerWidth, innerHeight);
-
-    renderer.setPixelRatio(
-        Math.min(devicePixelRatio, 1.5)
-    );
 });
 
-// =============================================
-// LOADING SCREEN
-// =============================================
+// --------------------------------------------------
+// VISIBILITY
+// --------------------------------------------------
 
-let loadingProgress = 0;
-
-const loadingTimer = setInterval(() => {
-    loadingProgress += 10;
-
-    $('loading-fill').style.width =
-        Math.min(loadingProgress, 100) + '%';
-
-    if (loadingProgress >= 100) {
-        clearInterval(loadingTimer);
-
-        setTimeout(() => {
-            const loading = $('loading');
-
-            loading.style.opacity = '0';
-
-            setTimeout(() => loading.remove(), 850);
-        }, 300);
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        Object.keys(input).forEach(key => input[key] = false);
+        if (audioContext) audioContext.suspend();
     }
-}, 100);
-
-console.log('NIGHTSHIFT//LITE HIGHWAY EDITION');
-console.log('HIGHWAY WORLD: READY');
-console.log('VEHICLE SYSTEM: READY');
-console.log('NITRO SYSTEM: READY');
+});
