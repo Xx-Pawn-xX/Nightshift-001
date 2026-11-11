@@ -133,8 +133,8 @@ export function createVehicle(scene, track) {
         }
 
         const maxSpeed = autoSteerEnabled
-            ? (state.boosting ? 598 : 564)
-            : (state.boosting ? 300 : 250);
+            ? (state.boosting ? 788 : 695)
+            : (state.boosting ? 360 : 358);
         state.speed = THREE.MathUtils.clamp(state.speed, -13, maxSpeed);
 
         if (state.boosting) state.nitro = Math.max(0, state.nitro - 27 * delta);
