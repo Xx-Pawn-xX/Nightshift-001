@@ -66,6 +66,7 @@ export function createVehicle(scene, track) {
         speed: 0,
         yaw: start.yaw,
         lateral: 0,
+        steer: 0,
         progress: 0,
         nitro: 100,
         drifting: false,
@@ -75,7 +76,9 @@ export function createVehicle(scene, track) {
     };
 
     function update(delta, input) {
-        const steer = Number(input.right) - Number(input.left);
+        const steerInput = Number(input.right) - Number(input.left);
+        state.steer = THREE.MathUtils.damp(state.steer, steerInput, 5, delta);
+        const steer = state.steer;
         const accelerating = input.gas;
         const braking = input.brake;
 
@@ -103,9 +106,9 @@ export function createVehicle(scene, track) {
         );
 
         const steerPower = THREE.MathUtils.clamp(Math.abs(state.speed) / 11, 0.1, 1);
-        state.yaw -= steer * 1.65 * steerPower * Math.sign(state.speed || 1) * delta;
+        state.yaw -= steer * 1.1 * steerPower * Math.sign(state.speed || 1) * delta;
 
-        state.lateral += steer * Math.abs(state.speed) * (state.drifting ? 0.48 : 0.14) * delta;
+        state.lateral += steer * Math.abs(state.speed) * (state.drifting ? 0.32 : 0.09) * delta;
         state.lateral *= Math.exp(-(state.drifting ? 1.35 : 6.8) * delta);
 
         const forwardX = -Math.sin(state.yaw);
@@ -137,7 +140,7 @@ export function createVehicle(scene, track) {
 
         const wheelRotation = -state.speed * delta / 0.46;
         for (const wheel of wheels) {
-            wheel.pivot.rotation.y = wheel.front ? -steer * 0.3 : 0;
+            wheel.pivot.rotation.y = wheel.front ? -steer * 0.22 : 0;
             wheel.wheel.rotation.x += wheelRotation;
         }
         red.emissiveIntensity = braking ? 6 : 3;
