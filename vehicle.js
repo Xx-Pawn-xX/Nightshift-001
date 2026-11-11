@@ -257,7 +257,7 @@ export function createVehicle(scene, track) {
             );
         }
 
-        const maxSpeed = state.boosting ? 76 : 58;
+        const maxSpeed = state.boosting ? 300 : 250;
 
         state.speed = THREE.MathUtils.clamp(
             state.speed,
