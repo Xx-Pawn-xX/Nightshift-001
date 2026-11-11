@@ -116,7 +116,7 @@ let smokeAccumulator = 0;
 const input = {
     left: false,
     right: false,
-    throttle; 0,
+    throttle: 0,
     brake: false,
     drift: false,
     nitro: false
@@ -179,7 +179,7 @@ function emitSmoke(position) {
     particle.velocity.set(
         (Math.random() - 0.5) * 0.8,
         Math.random() * 0.5,
-        Math.random() * 0.8
+        (Math.random() - 0.5) * 0.8
     );
 
     particle.life = 0.55;
