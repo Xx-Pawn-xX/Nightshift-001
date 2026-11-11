@@ -20,7 +20,6 @@ const ui = {
     nitroPercent: $('nitro-percent'),
     timer: $('timer'),
     drivingMode: $('driving-mode'),
-    minimap: $('minimap'),
     startScreen: $('start-screen'),
     finishScreen: $('finish-screen'),
     countdown: $('countdown'),
@@ -112,13 +111,12 @@ let countdown = 3;
 let countdownActive = false;
 
 let hudAccumulator = 0;
-let minimapAccumulator = 0;
 let smokeAccumulator = 0;
 
 const input = {
     left: false,
     right: false,
-    gas: false,
+    throttle; 0,
     brake: false,
     drift: false,
     nitro: false
@@ -269,6 +267,30 @@ function setInput(key, value) {
     }
 }
 
+// THROTTLE
+const throttleSlider = document.getElementById('throttle-slider');
+
+throttleSlider?.addEventListener('input', () => {
+    setInput('throttle', Number(throttleSlider.value) / 100);
+});
+
+// NITRO TOGGLE
+const nitroButton = document.getElementById('nitro-button');
+
+function updateNitroButton() {
+    if (!nitroButton) return;
+
+    nitroButton.textContent = input.nitro ? 'N₂O ON' : 'N₂O';
+    nitroButton.classList.toggle('active', input.nitro);
+    nitroButton.setAttribute('aria-pressed', String(input.nitro));
+}
+
+nitroButton?.addEventListener('click', () => {
+    setInput('nitro', !input.nitro);
+    updateNitroButton();
+});
+
+// KEYBOARD
 window.addEventListener('keydown', event => {
     const key = event.key.toLowerCase();
 
@@ -278,10 +300,14 @@ window.addEventListener('keydown', event => {
 
     if (key === 'arrowleft' || key === 'a') setInput('left', true);
     if (key === 'arrowright' || key === 'd') setInput('right', true);
-    if (key === 'arrowup' || key === 'w') setInput('gas', true);
+    if (key === 'arrowup' || key === 'w') setInput('throttle', 1);
     if (key === 'arrowdown' || key === 's') setInput('brake', true);
     if (key === ' ') setInput('drift', true);
-    if (key === 'shift') setInput('nitro', true);
+
+    if (key === 'shift' && !event.repeat) {
+        setInput('nitro', !input.nitro);
+        updateNitroButton();
+    }
 });
 
 window.addEventListener('keyup', event => {
@@ -289,63 +315,56 @@ window.addEventListener('keyup', event => {
 
     if (key === 'arrowleft' || key === 'a') setInput('left', false);
     if (key === 'arrowright' || key === 'd') setInput('right', false);
-    if (key === 'arrowup' || key === 'w') setInput('gas', false);
+    if (key === 'arrowup' || key === 'w') setInput('throttle', 0);
     if (key === 'arrowdown' || key === 's') setInput('brake', false);
     if (key === ' ') setInput('drift', false);
-    if (key === 'shift') setInput('nitro', false);
 });
 
-// Touch controls
-
+// TOUCH BUTTONS
 document.querySelectorAll('[data-control]').forEach(button => {
     const control = button.dataset.control;
 
     const press = event => {
         event.preventDefault();
-
         setInput(control, true);
         button.classList.add('active');
 
-        if (button.setPointerCapture) {
-            try {
-                button.setPointerCapture(event.pointerId);
-            } catch {}
-        }
+        try {
+            button.setPointerCapture(event.pointerId);
+        } catch {}
     };
 
     const release = event => {
         event.preventDefault();
-
         setInput(control, false);
         button.classList.remove('active');
     };
 
-    button.addEventListener('pointerdown', press, {
-        passive: false
-    });
-
-    button.addEventListener('pointerup', release, {
-        passive: false
-    });
-
-    button.addEventListener('pointercancel', release, {
-        passive: false
-    });
-
+    button.addEventListener('pointerdown', press, { passive: false });
+    button.addEventListener('pointerup', release, { passive: false });
+    button.addEventListener('pointercancel', release, { passive: false });
     button.addEventListener('lostpointercapture', release);
 });
 
+// RESET INPUT
 function clearInput() {
     Object.keys(input).forEach(key => {
         input[key] = false;
     });
 
+    input.throttle = 0;
+
+    if (throttleSlider) throttleSlider.value = 0;
+
     document.querySelectorAll('[data-control]').forEach(button => {
         button.classList.remove('active');
     });
+
+    updateNitroButton();
 }
 
 window.addEventListener('blur', clearInput);
+    
 
 // --------------------------------------------------
 // CAMERA
@@ -433,49 +452,7 @@ function updateHUD(speed) {
     }
 }
 
-// --------------------------------------------------
-// MINIMAP
-// --------------------------------------------------
 
-const minimap = ui.minimap;
-
-if (minimap) {
-    minimap.width = 120;
-    minimap.height = 180;
-}
-
-const mapCtx = minimap?.getContext('2d');
-
-function drawMinimap() {
-    if (!mapCtx) return;
-
-    mapCtx.fillStyle = '#07101d';
-    mapCtx.fillRect(0, 0, 120, 180);
-
-    mapCtx.strokeStyle = '#263d5a';
-    mapCtx.lineWidth = 30;
-
-    mapCtx.beginPath();
-    mapCtx.moveTo(60, 0);
-    mapCtx.lineTo(60, 180);
-    mapCtx.stroke();
-
-    mapCtx.strokeStyle = '#7aaaff';
-    mapCtx.lineWidth = 1;
-    mapCtx.setLineDash([8, 8]);
-
-    mapCtx.beginPath();
-    mapCtx.moveTo(60, 0);
-    mapCtx.lineTo(60, 180);
-    mapCtx.stroke();
-
-    mapCtx.setLineDash([]);
-
-    mapCtx.fillStyle = '#ffffff';
-    mapCtx.beginPath();
-    mapCtx.arc(60, 125, 5, 0, Math.PI * 2);
-    mapCtx.fill();
-}
 
 // --------------------------------------------------
 // GAME FLOW
@@ -666,13 +643,6 @@ function animate(now) {
 
     updateParticles(delta);
     updateCamera(delta);
-
-    minimapAccumulator += delta;
-
-    if (minimapAccumulator >= 0.1) {
-        drawMinimap();
-        minimapAccumulator = 0;
-    }
 
     updatePerformance(delta);
 
