@@ -1,22 +1,27 @@
 
 import * as THREE from 'three';
 
-// NIGHTSHIFT//LITE — VEHICLE SYSTEM
+// NIGHTSHIFT//LITE — OPTIMIZED VEHICLE SYSTEM
 
 export function createVehicle(scene, track) {
+
+    // --------------------------------------------------
+    // CAR
+    // --------------------------------------------------
+
     const car = new THREE.Group();
     scene.add(car);
 
     const paint = new THREE.MeshStandardMaterial({
         color: 0x064b80,
-        metalness: 0.9,
-        roughness: 0.19
+        metalness: 0.65,
+        roughness: 0.3
     });
 
     const dark = new THREE.MeshStandardMaterial({
         color: 0x08111f,
-        metalness: 0.8,
-        roughness: 0.18
+        metalness: 0.5,
+        roughness: 0.35
     });
 
     const rubber = new THREE.MeshStandardMaterial({
@@ -24,10 +29,8 @@ export function createVehicle(scene, track) {
         roughness: 0.95
     });
 
-    const blue = new THREE.MeshStandardMaterial({
-        color: 0x00caff,
-        emissive: 0x008cff,
-        emissiveIntensity: 3
+    const blue = new THREE.MeshBasicMaterial({
+        color: 0x00caff
     });
 
     const red = new THREE.MeshStandardMaterial({
@@ -36,18 +39,45 @@ export function createVehicle(scene, track) {
         emissiveIntensity: 3
     });
 
-    function box(parent, size, position, mat) {
+    // --------------------------------------------------
+    // GEOMETRY CACHE
+    // --------------------------------------------------
+
+    const boxCache = new Map();
+
+    function getBoxGeometry(size) {
+        const key = size.join(',');
+
+        if (!boxCache.has(key)) {
+            boxCache.set(
+                key,
+                new THREE.BoxGeometry(...size)
+            );
+        }
+
+        return boxCache.get(key);
+    }
+
+    function box(parent, size, position, material) {
         const mesh = new THREE.Mesh(
-            new THREE.BoxGeometry(...size), mat
+            getBoxGeometry(size),
+            material
         );
 
         mesh.position.set(...position);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+
+        // Shadows disabled for mobile performance.
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+
         parent.add(mesh);
 
         return mesh;
     }
+
+    // --------------------------------------------------
+    // BODY
+    // --------------------------------------------------
 
     box(car, [2.1, 0.55, 4.5], [0, 0.8, 0], paint);
     box(car, [2.2, 0.22, 3.9], [0, 0.55, 0], dark);
@@ -59,7 +89,6 @@ export function createVehicle(scene, track) {
     );
 
     cabin.position.set(0, 1.35, 0);
-    cabin.castShadow = true;
     car.add(cabin);
 
     box(car, [1.5, 0.1, 1.45], [0, 1.68, 0], paint);
@@ -69,27 +98,48 @@ export function createVehicle(scene, track) {
     box(car, [0.12, 0.32, 0.12], [-0.65, 1.36, 1.95], dark);
     box(car, [0.12, 0.32, 0.12], [0.65, 1.36, 1.95], dark);
 
+    // --------------------------------------------------
+    // LIGHTS
+    // --------------------------------------------------
+
     box(car, [0.55, 0.12, 0.08], [-0.66, 0.97, -2.26], blue);
     box(car, [0.55, 0.12, 0.08], [0.66, 0.97, -2.26], blue);
 
-    const brakeLeft = box(
-        car, [0.57, 0.13, 0.08], [-0.66, 0.95, 2.27], red
+    box(car, [0.57, 0.13, 0.08], [-0.66, 0.95, 2.27], red);
+    box(car, [0.57, 0.13, 0.08], [0.66, 0.95, 2.27], red);
+
+    // Lightweight underbody neon strip.
+    box(
+        car,
+        [1.6, 0.035, 2.8],
+        [0, 0.48, 0],
+        blue
     );
 
-    const brakeRight = box(
-        car, [0.57, 0.13, 0.08], [0.66, 0.95, 2.27], red
-    );
+    // --------------------------------------------------
+    // WHEELS
+    // --------------------------------------------------
 
     const wheels = [];
 
+    const wheelGeometry = new THREE.CylinderGeometry(
+        0.46, 0.46, 0.33, 12
+    );
+
+    const rimGeometry = new THREE.CylinderGeometry(
+        0.23, 0.23, 0.35, 10
+    );
+
     for (const x of [-1.05, 1.05]) {
         for (const z of [-1.42, 1.42]) {
+
             const pivot = new THREE.Group();
+
             pivot.position.set(x, 0.48, z);
             car.add(pivot);
 
             const wheel = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.46, 0.46, 0.33, 24),
+                wheelGeometry,
                 rubber
             );
 
@@ -97,7 +147,7 @@ export function createVehicle(scene, track) {
             pivot.add(wheel);
 
             const rim = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.23, 0.23, 0.35, 16),
+                rimGeometry,
                 blue
             );
 
@@ -112,30 +162,38 @@ export function createVehicle(scene, track) {
         }
     }
 
-    const glow = new THREE.PointLight(0x008cff, 24, 10);
-    glow.position.y = 0.15;
-    car.add(glow);
+    // --------------------------------------------------
+    // EXHAUST
+    // --------------------------------------------------
 
     const exhaustMat = new THREE.MeshBasicMaterial({
-        color: 0x39dfff,
-        transparent: true,
-        opacity: 0.8
+        color: 0x39dfff
     });
+
+    const exhaustGeometry = new THREE.ConeGeometry(
+        0.16, 0.8, 6
+    );
 
     const exhausts = [];
 
     for (const x of [-0.55, 0.55]) {
+
         const exhaust = new THREE.Mesh(
-            new THREE.ConeGeometry(0.16, 0.8, 8),
+            exhaustGeometry,
             exhaustMat
         );
 
         exhaust.rotation.x = Math.PI / 2;
         exhaust.position.set(x, 0.45, 2.6);
         exhaust.visible = false;
+
         car.add(exhaust);
         exhausts.push(exhaust);
     }
+
+    // --------------------------------------------------
+    // PHYSICS STATE
+    // --------------------------------------------------
 
     const initialYaw = track.roadYaw(track.startZ);
 
@@ -152,13 +210,16 @@ export function createVehicle(scene, track) {
 
     let previousRoadYaw = initialYaw;
 
-    function wrapAngle(angle) {
-        while (angle > Math.PI) angle -= Math.PI * 2;
-        while (angle < -Math.PI) angle += Math.PI * 2;
-        return angle;
-    }
+    // Reusable calculations.
+    const sin = Math.sin;
+    const cos = Math.cos;
+
+    // --------------------------------------------------
+    // UPDATE
+    // --------------------------------------------------
 
     function update(delta, input) {
+
         const steer =
             Number(input.right) - Number(input.left);
 
@@ -166,7 +227,8 @@ export function createVehicle(scene, track) {
         const braking = input.brake;
 
         state.boosting =
-            input.nitro && state.nitro > 0 &&
+            input.nitro &&
+            state.nitro > 0 &&
             state.speed > 5;
 
         state.drifting =
@@ -174,127 +236,187 @@ export function createVehicle(scene, track) {
 
         const boostPower = state.boosting ? 1.55 : 1;
 
+        // Acceleration.
         if (accelerating) {
             state.speed += 28 * boostPower * delta;
         }
 
+        // Braking and reverse.
         if (braking) {
-            if (state.speed > 0) {
-                state.speed -= 45 * delta;
-            } else {
-                state.speed -= 13 * delta;
-            }
+            state.speed -=
+                (state.speed > 0 ? 45 : 13) * delta;
         }
 
+        // Natural friction.
         if (!accelerating && !braking) {
             state.speed = THREE.MathUtils.damp(
-                state.speed, 0, 0.75, delta
+                state.speed,
+                0,
+                0.75,
+                delta
             );
         }
 
         const maxSpeed = state.boosting ? 76 : 58;
 
         state.speed = THREE.MathUtils.clamp(
-            state.speed, -13, maxSpeed
+            state.speed,
+            -13,
+            maxSpeed
         );
 
+        // Nitro.
         if (state.boosting) {
             state.nitro = Math.max(
-                0, state.nitro - 27 * delta
+                0,
+                state.nitro - 27 * delta
             );
         } else {
             state.nitro = Math.min(
-                100, state.nitro + 5 * delta
+                100,
+                state.nitro + 5 * delta
             );
         }
 
-        // Carry the road's gentle curvature into the car's heading.
+        // --------------------------------------------------
+        // ROAD CURVATURE
+        // --------------------------------------------------
+
         const roadYaw = track.roadYaw(car.position.z);
-        const curveChange = wrapAngle(
-            roadYaw - previousRoadYaw
-        );
+
+        let curveChange = roadYaw - previousRoadYaw;
+
+        if (curveChange > Math.PI) {
+            curveChange -= Math.PI * 2;
+        }
+
+        if (curveChange < -Math.PI) {
+            curveChange += Math.PI * 2;
+        }
 
         state.yaw += curveChange;
         previousRoadYaw = roadYaw;
 
+        // Steering.
         const steerPower = THREE.MathUtils.clamp(
             Math.abs(state.speed) / 11,
-            0.1, 1
+            0.1,
+            1
         );
 
-        state.yaw -= (
-            steer * 1.65 * steerPower *
-            Math.sign(state.speed || 1) * delta
-        );
+        state.yaw -=
+            steer *
+            1.65 *
+            steerPower *
+            Math.sign(state.speed || 1) *
+            delta;
 
-        state.lateral += (
-            steer * Math.abs(state.speed) *
-            (state.drifting ? 0.48 : 0.14) * delta
-        );
+        // Lateral movement.
+        state.lateral +=
+            steer *
+            Math.abs(state.speed) *
+            (state.drifting ? 0.48 : 0.14) *
+            delta;
 
         state.lateral *= Math.exp(
             -(state.drifting ? 1.35 : 6.8) * delta
         );
 
-        const forward = new THREE.Vector3(
-            0, 0, -1
-        ).applyAxisAngle(
-            new THREE.Vector3(0, 1, 0), state.yaw
-        );
+        // --------------------------------------------------
+        // MOVEMENT
+        // --------------------------------------------------
 
-        const right = new THREE.Vector3(
-            1, 0, 0
-        ).applyAxisAngle(
-            new THREE.Vector3(0, 1, 0), state.yaw
-        );
+        // Direct trigonometry: no temporary Vector3 objects.
+        const sy = sin(state.yaw);
+        const cy = cos(state.yaw);
 
-        car.position.addScaledVector(
-            forward, state.speed * delta
-        );
+        const forwardX = -sy;
+        const forwardZ = -cy;
 
-        car.position.addScaledVector(
-            right, state.lateral * delta
-        );
+        const rightX = cy;
+        const rightZ = -sy;
 
-        // Highway boundary detection.
+        car.position.x += (
+            forwardX * state.speed +
+            rightX * state.lateral
+        ) * delta;
+
+        car.position.z += (
+            forwardZ * state.speed +
+            rightZ * state.lateral
+        ) * delta;
+
+        // --------------------------------------------------
+        // ROAD BOUNDARIES
+        // --------------------------------------------------
+
         const center = track.centerX(car.position.z);
-        const roadOffset = Math.abs(car.position.x - center);
 
-        state.onRoad = roadOffset < track.width / 2 - 1.1;
+        const roadOffset = Math.abs(
+            car.position.x - center
+        );
+
+        state.onRoad =
+            roadOffset < track.width / 2 - 1.1;
 
         if (!state.onRoad) {
             state.speed *= Math.exp(-0.85 * delta);
         }
 
-        // Keep the vehicle on the highway surface.
         car.position.y = 0;
+
+        // --------------------------------------------------
+        // VISUAL ROTATION
+        // --------------------------------------------------
 
         car.rotation.y = state.yaw;
 
         car.rotation.z = THREE.MathUtils.damp(
             car.rotation.z,
-            -steer * Math.min(Math.abs(state.speed) / 70, 1) * 0.09,
-            4, delta
+            -steer *
+            Math.min(Math.abs(state.speed) / 70, 1) *
+            0.09,
+            4,
+            delta
         );
 
-        for (const w of wheels) {
-            w.pivot.rotation.y = w.front ? -steer * 0.3 : 0;
-            w.wheel.rotation.x -= state.speed * delta / 0.46;
+        // --------------------------------------------------
+        // WHEEL ANIMATION
+        // --------------------------------------------------
+
+        const wheelRotation =
+            -state.speed * delta / 0.46;
+
+        for (const wheel of wheels) {
+
+            wheel.pivot.rotation.y =
+                wheel.front ? -steer * 0.3 : 0;
+
+            wheel.wheel.rotation.x += wheelRotation;
         }
 
-        brakeLeft.material.emissiveIntensity = braking ? 6 : 3;
-        brakeRight.material.emissiveIntensity = braking ? 6 : 3;
+        // Brake lights.
+        red.emissiveIntensity = braking ? 6 : 3;
+
+        // Nitro exhaust.
+        const exhaustVisible = state.boosting;
 
         for (const exhaust of exhausts) {
-            exhaust.visible = state.boosting;
+            exhaust.visible = exhaustVisible;
         }
 
+        // Distance.
         state.distance = Math.max(
-            0, track.startZ - car.position.z
+            0,
+            track.startZ - car.position.z
         );
 
         return state;
     }
+
+    // --------------------------------------------------
+    // INITIAL POSITION
+    // --------------------------------------------------
 
     car.position.set(
         track.centerX(track.startZ),
@@ -304,9 +426,34 @@ export function createVehicle(scene, track) {
 
     car.rotation.y = initialYaw;
 
+    // --------------------------------------------------
+    // PUBLIC API
+    // --------------------------------------------------
+
     return {
         car,
         state,
-        update
+        update,
+
+        // Compatibility with game.js HUD.
+        get speed() {
+            return state.speed;
+        },
+
+        get nitro() {
+            return state.nitro;
+        },
+
+        get onRoad() {
+            return state.onRoad;
+        },
+
+        get drifting() {
+            return state.drifting;
+        },
+
+        get boosting() {
+            return state.boosting;
+        }
     };
 }
