@@ -1,23 +1,43 @@
 
 import * as THREE from 'three';
 
+// NIGHTSHIFT//LITE — HIGHWAY WORLD
+
+const ROAD_LENGTH = 6000;
+
 export const TRACK = {
-    rx: 82,
-    rz: 49,
-    width: 19,
-    laps: 3
+    width: 24,
+    startZ: 0,
+    roadStart: 1800,
+    roadEnd: -4200,
+    length: ROAD_LENGTH,
+
+    // Smooth, gradual highway bends.
+    centerX(z) {
+        return 14 * Math.sin(z / 260) +
+               6 * Math.sin(z / 720);
+    },
+
+    slope(z) {
+        return (14 / 260) * Math.cos(z / 260) +
+               (6 / 720) * Math.cos(z / 720);
+    },
+
+    roadYaw(z) {
+        return Math.atan2(-this.slope(z), 1);
+    }
 };
 
 export function createWorld(scene) {
     const mats = {
         road: new THREE.MeshStandardMaterial({
             color: 0x111725,
-            roughness: 0.3,
-            metalness: 0.48
+            roughness: 0.36,
+            metalness: 0.35
         }),
         ground: new THREE.MeshStandardMaterial({
             color: 0x070b14,
-            roughness: 0.95
+            roughness: 1
         }),
         blue: new THREE.MeshStandardMaterial({
             color: 0x00aaff,
@@ -27,104 +47,71 @@ export function createWorld(scene) {
         pink: new THREE.MeshStandardMaterial({
             color: 0xff176f,
             emissive: 0xff0055,
-            emissiveIntensity: 2
+            emissiveIntensity: 1.8
         }),
         metal: new THREE.MeshStandardMaterial({
             color: 0x26334b,
             metalness: 0.8,
-            roughness: 0.25
+            roughness: 0.28
+        }),
+        whiteLine: new THREE.MeshBasicMaterial({
+            color: 0xd7e9ff
+        }),
+        yellowLine: new THREE.MeshBasicMaterial({
+            color: 0xffd36a
         })
     };
 
     scene.background = new THREE.Color(0x050713);
-    scene.fog = new THREE.FogExp2(0x080d1c, 0.0025);
+    scene.fog = new THREE.FogExp2(0x080d1c, 0.00065);
 
-    // Lighting
     scene.add(new THREE.HemisphereLight(
-        0x9bbdff, 0x111322, 1.65
+        0x9bbdff, 0x111322, 1.55
     ));
 
-    const moon = new THREE.DirectionalLight(
-        0x9acbff, 2.1
-    );
-
+    const moon = new THREE.DirectionalLight(0x9acbff, 1.8);
     moon.position.set(-55, 90, -45);
     moon.castShadow = true;
     moon.shadow.mapSize.set(1024, 1024);
-    moon.shadow.camera.left = -110;
-    moon.shadow.camera.right = 110;
-    moon.shadow.camera.top = 110;
-    moon.shadow.camera.bottom = -110;
-
+    moon.shadow.camera.left = -100;
+    moon.shadow.camera.right = 100;
+    moon.shadow.camera.top = 100;
+    moon.shadow.camera.bottom = -100;
     scene.add(moon);
 
     const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(600, 600),
+        new THREE.PlaneGeometry(1800, ROAD_LENGTH + 1000),
         mats.ground
     );
 
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.3;
+    ground.position.set(0, -0.35, -1200);
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Track coordinates
-    function point(t, offset = 0) {
-        const x = TRACK.rx * Math.cos(t);
-        const z = TRACK.rz * Math.sin(t);
-
-        const tangent = new THREE.Vector3(
-            -TRACK.rx * Math.sin(t),
-            0,
-            TRACK.rz * Math.cos(t)
-        ).normalize();
-
-        const normal = new THREE.Vector3(
-            tangent.z, 0, -tangent.x
-        );
-
-        return new THREE.Vector3(
-            x + normal.x * offset,
-            0,
-            z + normal.z * offset
-        );
-    }
-
-    // Continuous track ribbon
-    function ribbon(width, material, height) {
+    // Highway surface built as a continuous curved ribbon.
+    function makeRoadRibbon(width, material, height, offset = 0) {
         const positions = [];
         const indices = [];
-        const segments = 360;
+        const segments = 600;
+        const half = width / 2;
 
         for (let i = 0; i <= segments; i++) {
-            const t = i / segments * Math.PI * 2;
-            const center = point(t);
+            const z = TRACK.roadStart -
+                (i / segments) * ROAD_LENGTH;
 
-            const tangent = new THREE.Vector3(
-                -TRACK.rx * Math.sin(t),
-                0,
-                TRACK.rz * Math.cos(t)
-            ).normalize();
-
-            const normal = new THREE.Vector3(
-                tangent.z, 0, -tangent.x
-            );
-
-            const half = width / 2;
+            const x = TRACK.centerX(z) + offset;
+            const angle = TRACK.roadYaw(z);
+            const nx = Math.cos(angle);
+            const nz = Math.sin(angle);
 
             positions.push(
-                center.x + normal.x * half,
-                height,
-                center.z + normal.z * half,
-
-                center.x - normal.x * half,
-                height,
-                center.z - normal.z * half
+                x + nx * half, height, z + nz * half,
+                x - nx * half, height, z - nz * half
             );
 
             if (i < segments) {
                 const a = i * 2;
-
                 indices.push(
                     a, a + 1, a + 2,
                     a + 1, a + 3, a + 2
@@ -132,107 +119,145 @@ export function createWorld(scene) {
             }
         }
 
-        const geo = new THREE.BufferGeometry();
-
-        geo.setAttribute(
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute(
             'position',
             new THREE.Float32BufferAttribute(positions, 3)
         );
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
 
-        geo.setIndex(indices);
-        geo.computeVertexNormals();
-
-        const mesh = new THREE.Mesh(geo, material);
+        const mesh = new THREE.Mesh(geometry, material);
         mesh.receiveShadow = true;
-
         scene.add(mesh);
     }
 
-    ribbon(TRACK.width + 2, mats.metal, 0);
-    ribbon(TRACK.width, mats.road, 0.045);
+    makeRoadRibbon(TRACK.width + 2.5, mats.metal, 0);
+    makeRoadRibbon(TRACK.width, mats.road, 0.055);
 
-    // Track edge lights
-    function neonEdge(offset, material) {
-        const points = [];
+    // Lane lines: two dashed white separators and yellow edges.
+    function addRoadMarking(offset, width, material, dashLength, gap) {
+        for (
+            let z = TRACK.roadStart;
+            z > TRACK.roadEnd;
+            z -= dashLength + gap
+        ) {
+            const mid = z - dashLength / 2;
+            const angle = TRACK.roadYaw(mid);
 
-        for (let i = 0; i <= 360; i++) {
-            const p = point(i / 360 * Math.PI * 2, offset);
-            p.y = 0.28;
-            points.push(p);
-        }
-
-        const curve = new THREE.CatmullRomCurve3(
-            points, true
-        );
-
-        const tube = new THREE.Mesh(
-            new THREE.TubeGeometry(curve, 360, 0.11, 5, true),
-            material
-        );
-
-        scene.add(tube);
-    }
-
-    neonEdge(9.6, mats.blue);
-    neonEdge(-9.6, mats.pink);
-
-    // Centerline markings
-    const markingMat = new THREE.MeshBasicMaterial({
-        color: 0x5bcfff,
-        transparent: true,
-        opacity: 0.6
-    });
-
-    for (let i = 0; i < 120; i++) {
-        const t = i / 120 * Math.PI * 2;
-        const p = point(t);
-
-        const tangent = new THREE.Vector3(
-            -TRACK.rx * Math.sin(t),
-            0,
-            TRACK.rz * Math.cos(t)
-        );
-
-        const dash = new THREE.Mesh(
-            new THREE.BoxGeometry(0.12, 0.035, 1.5),
-            markingMat
-        );
-
-        dash.position.set(p.x, 0.105, p.z);
-        dash.rotation.y = Math.atan2(
-            tangent.x, tangent.z
-        );
-
-        scene.add(dash);
-    }
-
-    // Track guardrails
-    for (const side of [-1, 1]) {
-        const points = [];
-
-        for (let i = 0; i <= 360; i++) {
-            const p = point(
-                i / 360 * Math.PI * 2,
-                side * 11
+            const dash = new THREE.Mesh(
+                new THREE.BoxGeometry(width, 0.035, dashLength),
+                material
             );
 
-            p.y = 0.75;
-            points.push(p);
+            dash.position.set(
+                TRACK.centerX(mid) + Math.cos(angle) * offset,
+                0.105,
+                mid + Math.sin(angle) * offset
+            );
+
+            dash.rotation.y = angle;
+            scene.add(dash);
         }
-
-        const curve = new THREE.CatmullRomCurve3(
-            points, true
-        );
-
-        const rail = new THREE.Mesh(
-            new THREE.TubeGeometry(curve, 360, 0.32, 6, true),
-            mats.metal
-        );
-
-        scene.add(rail);
     }
 
-    // City buildings
+    addRoadMarking(-4, 0.12, mats.whiteLine, 5, 5);
+    addRoadMarking(4, 0.12, mats.whiteLine, 5, 5);
+    addRoadMarking(-11.35, 0.2, mats.yellowLine, 6000, 0);
+    addRoadMarking(11.35, 0.2, mats.yellowLine, 6000, 0);
+
+    // Roadside barriers.
+    for (const side of [-1, 1]) {
+        for (
+            let z = TRACK.roadStart;
+            z > TRACK.roadEnd;
+            z -= 8
+        ) {
+            const mid = z - 4;
+            const angle = TRACK.roadYaw(mid);
+            const offset = side * 13.2;
+
+            const rail = new THREE.Mesh(
+                new THREE.BoxGeometry(0.45, 0.75, 8.2),
+                mats.metal
+            );
+
+            rail.position.set(
+                TRACK.centerX(mid) + Math.cos(angle) * offset,
+                0.65,
+                mid + Math.sin(angle) * offset
+            );
+
+            rail.rotation.y = angle;
+            rail.castShadow = true;
+            scene.add(rail);
+
+            const neon = new THREE.Mesh(
+                new THREE.BoxGeometry(0.12, 0.09, 8.1),
+                side < 0 ? mats.blue : mats.pink
+            );
+
+            neon.position.copy(rail.position);
+            neon.position.y = 1.03;
+            neon.rotation.y = angle;
+            scene.add(neon);
+        }
+    }
+
+    // Streetlights along both sides.
+    for (
+        let z = TRACK.roadStart - 15;
+        z > TRACK.roadEnd;
+        z -= 55
+    ) {
+        const angle = TRACK.roadYaw(z);
+
+        for (const side of [-1, 1]) {
+            const offset = side * 17;
+            const x = TRACK.centerX(z) +
+                Math.cos(angle) * offset;
+            const zz = z + Math.sin(angle) * offset;
+
+            const pole = new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    0.09, 0.13, 9, 8
+                ),
+                mats.metal
+            );
+
+            pole.position.set(x, 4.5, zz);
+            scene.add(pole);
+
+            const arm = new THREE.Mesh(
+                new THREE.BoxGeometry(2.8, 0.12, 0.12),
+                mats.metal
+            );
+
+            arm.position.set(
+                x - side * 1.2, 8.7, zz
+            );
+            scene.add(arm);
+
+            const lamp = new THREE.PointLight(
+                side < 0 ? 0x68baff : 0xffb9d4,
+                28,
+                42
+            );
+
+            lamp.position.set(x - side * 2.1, 8.3, zz);
+            scene.add(lamp);
+
+            const bulb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.2, 8, 8),
+                side < 0 ? mats.blue : mats.pink
+            );
+
+            bulb.position.copy(lamp.position);
+            scene.add(bulb);
+        }
+    }
+
+    // Procedural city skyline.
     const buildingMats = [
         new THREE.MeshStandardMaterial({
             color: 0x111d35,
@@ -257,16 +282,13 @@ export function createWorld(scene) {
         new THREE.MeshBasicMaterial({ color: 0x7a9fff })
     ];
 
-    for (let i = 0; i < 115; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 105 + Math.random() * 110;
-
-        const x = Math.cos(angle) * distance;
-        const z = Math.sin(angle) * distance;
-
-        const height = 12 + Math.random() * 65;
-        const width = 7 + Math.random() * 13;
-        const depth = 7 + Math.random() * 13;
+    for (let i = 0; i < 180; i++) {
+        const z = 1500 - Math.random() * 5700;
+        const side = Math.random() < 0.5 ? -1 : 1;
+        const distance = 65 + Math.random() * 180;
+        const height = 15 + Math.random() * 75;
+        const width = 9 + Math.random() * 17;
+        const depth = 9 + Math.random() * 17;
 
         const group = new THREE.Group();
 
@@ -276,77 +298,59 @@ export function createWorld(scene) {
         );
 
         building.position.y = height / 2;
+        building.castShadow = true;
         group.add(building);
 
-        // Vertical illuminated facade
         const accent = new THREE.Mesh(
-            new THREE.BoxGeometry(0.16, height * 0.8, 0.2),
+            new THREE.BoxGeometry(0.18, height * 0.8, 0.2),
             windowMats[i % windowMats.length]
         );
 
         accent.position.set(
-            width / 2 + 0.1,
-            height * 0.5,
-            depth / 2 + 0.1
+            width / 2 + 0.1, height * 0.5, depth / 2 + 0.1
         );
-
         group.add(accent);
 
-        // Rooftop structure
-        if (i % 4 === 0) {
-            const roof = new THREE.Mesh(
-                new THREE.BoxGeometry(
-                    width * 0.45, 2, depth * 0.45
-                ),
-                mats.metal
-            );
+        group.position.set(
+            TRACK.centerX(z) + side * distance,
+            0,
+            z
+        );
 
-            roof.position.y = height + 1;
-            group.add(roof);
-        }
-
-        group.position.set(x, 0, z);
         scene.add(group);
     }
 
-    // City light columns
-    for (let i = 0; i < 20; i++) {
-        const t = i / 20 * Math.PI * 2;
-        const p = point(t, 15);
+    // Distant skyline silhouettes.
+    for (let i = 0; i < 65; i++) {
+        const z = 1300 - Math.random() * 5200;
+        const side = Math.random() < 0.5 ? -1 : 1;
 
-        const lamp = new THREE.PointLight(
-            i % 2 ? 0x008cff : 0xff176f,
-            95,
-            42
-        );
-
-        lamp.position.set(p.x, 7, p.z);
-        scene.add(lamp);
-
-        const pole = new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                0.08, 0.12, 7, 6
+        const building = new THREE.Mesh(
+            new THREE.BoxGeometry(
+                15 + Math.random() * 30,
+                30 + Math.random() * 110,
+                15 + Math.random() * 30
             ),
-            mats.metal
+            buildingMats[i % buildingMats.length]
         );
 
-        pole.position.set(p.x, 3.5, p.z);
-        scene.add(pole);
+        building.position.set(
+            TRACK.centerX(z) + side * (210 + Math.random() * 180),
+            building.geometry.parameters.height / 2,
+            z
+        );
+
+        scene.add(building);
     }
 
-    // Starting line
+    // Starting marker.
     const start = new THREE.Mesh(
-        new THREE.BoxGeometry(
-            0.8, 0.045, TRACK.width
-        ),
-        new THREE.MeshBasicMaterial({
-            color: 0xe5faff
-        })
+        new THREE.BoxGeometry(TRACK.width, 0.035, 0.7),
+        new THREE.MeshBasicMaterial({ color: 0xe5faff })
     );
 
-    start.position.set(TRACK.rx, 0.12, 0);
-    start.rotation.y = Math.PI / 2;
+    start.position.set(TRACK.centerX(0), 0.12, 0);
     scene.add(start);
 
-    return { point };
+    return { track: TRACK };
 }
