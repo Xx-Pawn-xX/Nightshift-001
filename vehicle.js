@@ -106,21 +106,17 @@ export function createVehicle(scene, track) {
         state.steer = THREE.MathUtils.damp(state.steer, steerInput, 5, delta);
         const steer = state.steer;
 
-        // Nitro is available in both driving modes. Auto targets 417 normally
-        // and 451 while nitro is actively boosting.
+        // Auto-steer controls direction only. The player still has to hold gas;
+        // nitro raises the auto-mode speed cap while it is actively boosting.
         state.boosting = input.nitro && state.nitro > 0 && state.speed > 5;
         state.drifting = !autoSteerEnabled && input.drift && state.speed > 8;
         const boostPower = state.boosting ? 1.55 : 1;
-        const targetAutoSpeed = state.boosting ? 451 : 417;
-        const accelerating = autoSteerEnabled
-            ? state.speed < targetAutoSpeed - 1 && !input.brake
-            : input.gas;
-        const braking = input.brake ||
-            (autoSteerEnabled && state.speed > targetAutoSpeed + 1);
+        const accelerating = input.gas;
+        const braking = input.brake;
 
         if (accelerating) state.speed += 28 * boostPower * delta;
         if (braking) state.speed -= (state.speed > 0 ? 45 : 13) * delta;
-        if (!accelerating && !braking && !autoSteerEnabled) {
+        if (!accelerating && !braking) {
             state.speed = THREE.MathUtils.damp(state.speed, 0, 0.75, delta);
         }
 
