@@ -112,28 +112,28 @@ export function createVehicle(scene, track) {
         state.drifting = !autoSteerEnabled && input.drift && state.speed > 8;
         const boostPower = state.boosting ? 1.55 : 1;
         const throttle = THREE.MathUtils.clamp(
-    input.throttle ?? 0,
-    0,
-    1
-);
+            input.throttle ?? 0,
+            0,
+            1
+        );
 
-const accelerating = throttle > 0;
-const braking = input.brake;
+        const accelerating = throttle > 0;
+        const braking = input.brake;
 
-if (accelerating) {
-    state.speed += 28 * throttle * boostPower * delta;
-}
+        if (accelerating) {
+            state.speed += 28 * throttle * boostPower * delta;
+        }
 
-if (braking) {
-    state.speed -= (state.speed > 0 ? 45 : 13) * delta;
-}
+        if (braking) {
+            state.speed -= (state.speed > 0 ? 45 : 13) * delta;
+        }
 
-if (!accelerating && !braking) {
-    state.speed = THREE.MathUtils.damp(state.speed, 0, 0.75, delta);
-}
+        if (!accelerating && !braking) {
+            state.speed = THREE.MathUtils.damp(state.speed, 0, 0.75, delta);
+        }
 
         const maxSpeed = autoSteerEnabled
-            ? (state.boosting ? 451 : 417)
+            ? (state.boosting ? 598 : 564)
             : (state.boosting ? 300 : 250);
         state.speed = THREE.MathUtils.clamp(state.speed, -13, maxSpeed);
 
