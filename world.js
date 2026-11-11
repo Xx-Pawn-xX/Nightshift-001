@@ -113,9 +113,9 @@ export function createWorld(scene) {
             if (i < segments) {
                 const a = i * 2;
                 indices.push(
-                    a, a + 1, a + 2,
-                    a + 1, a + 3, a + 2
-                );
+    a, a + 2, a + 1,
+    a + 1, a + 2, a + 3
+);
             }
         }
 
