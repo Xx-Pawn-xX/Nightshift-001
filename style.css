@@ -518,3 +518,137 @@ button {
 @media (pointer: fine) {
     #touch-controls { opacity: .7; }
 }
+
+/* =============================================
+   NIGHTSHIFT//LITE — HIGHWAY EDITION
+   iPad / TOUCH CONTROL UPGRADE
+============================================= */
+
+/* Make the controls easier to hit. */
+.touch-button {
+    min-width: 76px;
+    height: 76px;
+    font-size: 13px;
+    border-radius: 12px;
+    border-width: 1.5px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.gas-button {
+    width: 105px;
+    height: 94px;
+    font-size: 15px;
+}
+
+.steer-group,
+.drive-group {
+    bottom: max(25px, env(safe-area-inset-bottom));
+    gap: 12px;
+}
+
+.steer-group {
+    left: max(24px, env(safe-area-inset-left));
+}
+
+.drive-group {
+    right: max(24px, env(safe-area-inset-right));
+}
+
+.touch-button:active,
+.touch-button.active {
+    transform: scale(0.96);
+}
+
+/* iPad and other touch devices. */
+@media (pointer: coarse) {
+    .touch-button {
+        min-width: 88px;
+        height: 88px;
+        font-size: 15px;
+        border-radius: 14px;
+    }
+
+    .gas-button {
+        width: 116px;
+        height: 104px;
+        font-size: 16px;
+    }
+
+    .steer-group,
+    .drive-group {
+        gap: 14px;
+        bottom: max(30px, env(safe-area-inset-bottom));
+    }
+
+    .steer-group {
+        left: max(30px, env(safe-area-inset-left));
+    }
+
+    .drive-group {
+        right: max(30px, env(safe-area-inset-right));
+    }
+}
+
+/* Larger iPad screens. */
+@media (pointer: coarse) and (min-width: 900px) {
+    .touch-button {
+        min-width: 98px;
+        height: 98px;
+        font-size: 16px;
+    }
+
+    .gas-button {
+        width: 128px;
+        height: 112px;
+    }
+
+    .steer-group,
+    .drive-group {
+        gap: 17px;
+        bottom: 38px;
+    }
+}
+
+/* Small phones: keep controls comfortable without
+   covering too much of the screen. */
+@media (max-width: 650px) {
+    .touch-button {
+        min-width: 64px;
+        height: 66px;
+        font-size: 11px;
+    }
+
+    .gas-button {
+        width: 80px;
+        height: 76px;
+    }
+
+    .steer-group,
+    .drive-group {
+        gap: 8px;
+        bottom: max(15px, env(safe-area-inset-bottom));
+    }
+}
+
+/* Highway HUD improvements. */
+#minimap-wrap {
+    border-color: rgba(0, 200, 255, .35);
+    box-shadow: 0 0 20px rgba(0, 150, 255, .08);
+}
+
+#minimap-wrap span {
+    letter-spacing: 2.5px;
+}
+
+.speed-hud {
+    border-color: rgba(0, 200, 255, .25);
+}
+
+/* Prevent accidental text selection while driving. */
+#touch-controls,
+.touch-button {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
