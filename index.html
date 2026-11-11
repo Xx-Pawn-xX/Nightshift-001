@@ -105,22 +105,29 @@
             NIGHT CITY CIRCUIT <span class="separator">/</span> SECTOR 01
         </div>
 
-        <div id="minimap-wrap">
-            <canvas id="minimap" width="180" height="140"></canvas>
-            <span>TRACK RADAR</span>
-        </div>
-
         <section id="touch-controls">
             <div class="steer-group">
                 <button class="touch-button steer-button" data-control="left">◀</button>
                 <button class="touch-button steer-button" data-control="right">▶</button>
             </div>
             <div class="drive-group">
-                <button class="touch-button brake-button" data-control="brake">BRAKE</button>
-                <button class="touch-button drift-button" data-control="drift">DRIFT</button>
-                <button class="touch-button nitro-button" data-control="nitro">N₂O</button>
-                <button class="touch-button gas-button" data-control="gas">GAS</button>
-            </div>
+    <button class="touch-button brake-button" data-control="brake">BRAKE</button>
+    <button class="touch-button drift-button" data-control="drift">DRIFT</button>
+    <button class="touch-button nitro-button" id="nitro-button" type="button" aria-pressed="false">N₂O</button>
+
+    <div class="throttle-control">
+        <input
+            id="throttle-slider"
+            type="range"
+            min="0"
+            max="100"
+            value="0"
+            step="1"
+            aria-label="Throttle"
+        >
+        <label for="throttle-slider">THROTTLE</label>
+    </div>
+</div>
         </section>
 
         <div id="toast"></div>
