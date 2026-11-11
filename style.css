@@ -382,34 +382,6 @@ button {
     margin: 0 8px;
 }
 
-/* Minimap */
-
-#minimap-wrap {
-    position: absolute;
-    left: 25px;
-    bottom: 65px;
-    width: 180px;
-    padding: 7px;
-    background: var(--glass);
-    border: 1px solid rgba(0,200,255,.22);
-    pointer-events: none;
-}
-
-#minimap {
-    display: block;
-    width: 100%;
-    height: auto;
-}
-
-#minimap-wrap span {
-    display: block;
-    text-align: center;
-    font: 8px Orbitron;
-    letter-spacing: 2px;
-    color: var(--blue);
-    padding: 5px;
-}
-
 /* Countdown */
 
 .countdown {
@@ -469,6 +441,7 @@ button {
     height: 78px;
     color: var(--blue);
     border-color: var(--blue);
+    font-size: 12px;
 }
 
 .nitro-button { color: #65baff; }
@@ -504,12 +477,11 @@ button {
     .hud-card strong { font-size: 10px; }
     .speed-hud { right: 12px; bottom: 120px; width: 150px; padding: 10px; }
     .speed-main span { font-size: 37px; }
-    #minimap-wrap { left: 12px; bottom: 115px; width: 115px; }
     .location-label { display: none; }
     .steer-group { left: 12px; bottom: 15px; gap: 6px; }
     .drive-group { right: 12px; bottom: 15px; gap: 6px; }
     .touch-button { min-width: 45px; height: 51px; font-size: 9px; }
-    .gas-button { width: 62px; height: 68px; }
+    .gas-button { width: 74px; height: 68px; font-size: 9px; }
     .screen { padding: 24px; background: rgba(3,7,17,.78); }
     .start-content h1 { letter-spacing: -2px; }
     .small-note { line-height: 2; }
@@ -519,12 +491,7 @@ button {
     #touch-controls { opacity: .7; }
 }
 
-/* =============================================
-   NIGHTSHIFT//LITE — HIGHWAY EDITION
-   iPad / TOUCH CONTROL UPGRADE
-============================================= */
-
-/* Make the controls easier to hit. */
+/* Larger, easy-to-hit touch controls. */
 .touch-button {
     min-width: 76px;
     height: 76px;
@@ -537,7 +504,7 @@ button {
 .gas-button {
     width: 105px;
     height: 94px;
-    font-size: 15px;
+    font-size: 13px;
 }
 
 .steer-group,
@@ -559,7 +526,6 @@ button {
     transform: scale(0.96);
 }
 
-/* iPad and other touch devices. */
 @media (pointer: coarse) {
     .touch-button {
         min-width: 88px;
@@ -571,7 +537,7 @@ button {
     .gas-button {
         width: 116px;
         height: 104px;
-        font-size: 16px;
+        font-size: 14px;
     }
 
     .steer-group,
@@ -589,7 +555,6 @@ button {
     }
 }
 
-/* Larger iPad screens. */
 @media (pointer: coarse) and (min-width: 900px) {
     .touch-button {
         min-width: 98px;
@@ -609,8 +574,6 @@ button {
     }
 }
 
-/* Small phones: keep controls comfortable without
-   covering too much of the screen. */
 @media (max-width: 650px) {
     .touch-button {
         min-width: 64px;
@@ -621,6 +584,7 @@ button {
     .gas-button {
         width: 80px;
         height: 76px;
+        font-size: 9px;
     }
 
     .steer-group,
@@ -628,16 +592,6 @@ button {
         gap: 8px;
         bottom: max(15px, env(safe-area-inset-bottom));
     }
-}
-
-/* Highway HUD improvements. */
-#minimap-wrap {
-    border-color: rgba(0, 200, 255, .35);
-    box-shadow: 0 0 20px rgba(0, 150, 255, .08);
-}
-
-#minimap-wrap span {
-    letter-spacing: 2.5px;
 }
 
 .speed-hud {
@@ -651,4 +605,3 @@ button {
     user-select: none;
     -webkit-touch-callout: none;
 }
-
