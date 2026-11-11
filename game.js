@@ -3,21 +3,15 @@ import * as THREE from 'three';
 import { TRACK, createWorld } from './world.js';
 import { createVehicle } from './vehicle.js';
 
-// =============================================
-// NIGHTSHIFT//LITE — GAME CONTROLLER
-// =============================================
+// NIGHTSHIFT//LITE — HIGHWAY CONTROLLER
 
 const $ = id => document.getElementById(id);
-
 const root = $('world');
 
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
-    68,
-    innerWidth / innerHeight,
-    0.1,
-    700
+    68, innerWidth / innerHeight, 0.1, 900
 );
 
 const renderer = new THREE.WebGLRenderer({
@@ -35,7 +29,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 root.appendChild(renderer.domElement);
 
-// Build world and vehicle
+// World and car
 createWorld(scene);
 
 const vehicle = createVehicle(scene, TRACK);
@@ -54,12 +48,7 @@ const input = {
 
 let started = false;
 let paused = false;
-let finished = false;
-
 let raceTime = 0;
-let progress = 0;
-let previousAngle = 0;
-
 let cameraShake = 0;
 let smokeTimer = 0;
 let countdownActive = false;
@@ -93,7 +82,7 @@ window.addEventListener('keydown', event => {
         input[action] = true;
     }
 
-    if (event.code === 'Escape' && started && !finished) {
+    if (event.code === 'Escape' && started) {
         togglePause();
     }
 });
@@ -107,15 +96,17 @@ window.addEventListener('keyup', event => {
     }
 });
 
-window.addEventListener('blur', () => {
-    clearInput();
-});
-
 function clearInput() {
     Object.keys(input).forEach(key => {
         input[key] = false;
     });
+
+    document.querySelectorAll('[data-control]').forEach(button => {
+        button.classList.remove('active');
+    });
 }
+
+window.addEventListener('blur', clearInput);
 
 document.querySelectorAll('[data-control]').forEach(button => {
     const action = button.dataset.control;
@@ -123,7 +114,7 @@ document.querySelectorAll('[data-control]').forEach(button => {
     const down = event => {
         event.preventDefault();
 
-        if (paused || !started || finished) return;
+        if (paused || !started) return;
 
         input[action] = true;
         button.classList.add('active');
@@ -146,7 +137,7 @@ document.querySelectorAll('[data-control]').forEach(button => {
 });
 
 // =============================================
-// AUDIO SYSTEM
+// AUDIO
 // =============================================
 
 let audioContext;
@@ -195,16 +186,13 @@ function updateAudio() {
 
     const state = vehicle.state;
 
-    const targetFrequency =
-        42 + Math.abs(state.speed) * 2.4;
-
     engineOscillator.frequency.setTargetAtTime(
-        targetFrequency,
+        42 + Math.abs(state.speed) * 2.4,
         audioContext.currentTime,
         0.08
     );
 
-    const volume = started && !paused && !finished
+    const volume = started && !paused
         ? 0.025 + Math.abs(state.speed) * 0.00035
         : 0.0001;
 
@@ -222,22 +210,22 @@ function updateAudio() {
 }
 
 // =============================================
-// PARTICLES
+// DRIFT PARTICLES
 // =============================================
-
-const particleMaterial = new THREE.MeshBasicMaterial({
-    color: 0xb7d6e8,
-    transparent: true,
-    opacity: 0.32,
-    depthWrite: false
-});
 
 const particles = [];
 
 for (let i = 0; i < 35; i++) {
+    const material = new THREE.MeshBasicMaterial({
+        color: 0xb7d6e8,
+        transparent: true,
+        opacity: 0.32,
+        depthWrite: false
+    });
+
     const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.2, 6, 6),
-        particleMaterial.clone()
+        material
     );
 
     mesh.visible = false;
@@ -263,13 +251,10 @@ function spawnSmoke() {
         particleIndex = (particleIndex + 1) % particles.length;
 
         const offset = new THREE.Vector3(
-            side * 0.9,
-            0.35,
-            1.35
+            side * 0.9, 0.35, 1.35
         ).applyQuaternion(car.quaternion);
 
         p.mesh.position.copy(car.position).add(offset);
-
         p.mesh.scale.setScalar(0.5 + Math.random() * 0.5);
         p.mesh.visible = true;
         p.life = 0.65;
@@ -290,7 +275,6 @@ function updateParticles(delta) {
 
         p.mesh.position.y += delta * 1.1;
         p.mesh.scale.multiplyScalar(1 + delta * 1.2);
-
         p.mesh.material.opacity =
             0.32 * p.life / p.maxLife;
     }
@@ -302,7 +286,6 @@ function updateParticles(delta) {
 
 function updateCamera(delta) {
     const state = vehicle.state;
-
     const speedFactor = Math.abs(state.speed) / 65;
 
     const offset = new THREE.Vector3(
@@ -312,18 +295,14 @@ function updateCamera(delta) {
     );
 
     offset.applyQuaternion(car.quaternion);
-
     desiredCamera.copy(car.position).add(offset);
 
-    if (state.boosting) {
-        cameraShake = THREE.MathUtils.damp(
-            cameraShake, 0.09, 5, delta
-        );
-    } else {
-        cameraShake = THREE.MathUtils.damp(
-            cameraShake, 0, 5, delta
-        );
-    }
+    cameraShake = THREE.MathUtils.damp(
+        cameraShake,
+        state.boosting ? 0.09 : 0,
+        5,
+        delta
+    );
 
     desiredCamera.x += (Math.random() - 0.5) * cameraShake;
     desiredCamera.y += (Math.random() - 0.5) * cameraShake;
@@ -334,7 +313,7 @@ function updateCamera(delta) {
     );
 
     cameraTarget.copy(car.position);
-    cameraTarget.y += 1.0;
+    cameraTarget.y += 1;
 
     camera.lookAt(cameraTarget);
 
@@ -350,61 +329,7 @@ function updateCamera(delta) {
 }
 
 // =============================================
-// RACE PROGRESS
-// =============================================
-
-function getTrackAngle() {
-    return Math.atan2(
-        car.position.z / TRACK.rz,
-        car.position.x / TRACK.rx
-    );
-}
-
-function updateRaceProgress() {
-    const angle = getTrackAngle();
-
-    let difference = angle - previousAngle;
-
-    if (difference > Math.PI) difference -= Math.PI * 2;
-    if (difference < -Math.PI) difference += Math.PI * 2;
-
-    previousAngle = angle;
-
-    if (
-        vehicle.state.onRoad &&
-        vehicle.state.speed > 1 &&
-        difference > 0 &&
-        difference < 0.15
-    ) {
-        progress += difference;
-    }
-
-    const lapProgress = progress / (Math.PI * 2);
-
-    const lap = Math.min(
-        TRACK.laps,
-        Math.floor(lapProgress) + 1
-    );
-
-    const checkpoint = Math.min(
-        4,
-        Math.floor((lapProgress % 1) * 4) + 1
-    );
-
-    $('lap').innerHTML =
-        String(lap).padStart(2, '0') + ' <span>/ 03</span>';
-
-    $('checkpoint').innerHTML =
-        String(checkpoint).padStart(2, '0') +
-        ' <span>/ 04</span>';
-
-    if (progress >= TRACK.laps * Math.PI * 2) {
-        finishRace();
-    }
-}
-
-// =============================================
-// HUD
+// DISTANCE / HUD
 // =============================================
 
 function formatTime(seconds) {
@@ -421,8 +346,8 @@ function formatTime(seconds) {
 
 function updateHUD() {
     const state = vehicle.state;
-
     const kmh = Math.round(Math.abs(state.speed) * 3.6);
+    const distanceKm = state.distance / 1000;
 
     $('speed').textContent =
         String(kmh).padStart(3, '0');
@@ -447,13 +372,20 @@ function updateHUD() {
     $('driving-mode').textContent =
         state.boosting ? 'BOOST' :
         state.drifting ? 'DRIFT' :
-        state.onRoad ? 'SPORT' : 'OFF ROAD';
+        state.onRoad ? 'HIGHWAY' : 'OFF ROAD';
 
     $('timer').textContent = formatTime(raceTime);
+
+    // Reuse the existing HUD fields for distance and road status.
+    $('lap').innerHTML =
+        distanceKm.toFixed(2) + ' <span>KM</span>';
+
+    $('checkpoint').innerHTML =
+        state.onRoad ? 'ON ROAD' : 'OFF ROAD';
 }
 
 // =============================================
-// MINIMAP
+// HIGHWAY MINIMAP
 // =============================================
 
 const map = $('minimap');
@@ -464,35 +396,36 @@ function drawMinimap() {
     const h = map.height;
 
     ctx.clearRect(0, 0, w, h);
-
     ctx.save();
 
     ctx.translate(w / 2, h / 2);
 
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 69, 46, 0, 0, Math.PI * 2);
+    // Straight highway symbol.
+    ctx.fillStyle = '#1b304b';
+    ctx.fillRect(-15, -h / 2, 30, h);
 
-    ctx.strokeStyle = '#1b304b';
-    ctx.lineWidth = 14;
-    ctx.stroke();
+    ctx.fillStyle = '#5bcfff';
+    ctx.fillRect(-1, -h / 2, 2, h);
 
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 69, 46, 0, 0, Math.PI * 2);
-
-    ctx.strokeStyle = '#00bfff';
+    ctx.strokeStyle = '#d9eaff';
     ctx.lineWidth = 1.5;
+    ctx.setLineDash([7, 7]);
+    ctx.beginPath();
+    ctx.moveTo(0, -h / 2);
+    ctx.lineTo(0, h / 2);
     ctx.stroke();
+    ctx.setLineDash([]);
 
-    const x = car.position.x / TRACK.rx * 69;
-    const z = car.position.z / TRACK.rz * 46;
-
+    // Car marker.
     ctx.shadowBlur = 12;
     ctx.shadowColor = '#00dfff';
+    ctx.fillStyle = '#ffffff';
 
     ctx.beginPath();
-    ctx.arc(x, z, 4, 0, Math.PI * 2);
-
-    ctx.fillStyle = '#ffffff';
+    ctx.moveTo(0, -8);
+    ctx.lineTo(-6, 6);
+    ctx.lineTo(6, 6);
+    ctx.closePath();
     ctx.fill();
 
     ctx.restore();
@@ -543,12 +476,11 @@ function startCountdown() {
         element.textContent = sequence[index];
 
         toast(sequence[index] === 'GO!'
-            ? 'RACE START'
+            ? 'HIGHWAY OPEN'
             : 'GET READY'
         );
 
         index++;
-
         setTimeout(next, 850);
     }
 
@@ -556,44 +488,24 @@ function startCountdown() {
 }
 
 // =============================================
-// PAUSE / FINISH / RESTART
+// PAUSE / RESTART
 // =============================================
 
 function togglePause() {
-    if (!started || finished) return;
+    if (!started) return;
 
     paused = !paused;
-
     clearInput();
 
     $('pause-button').textContent = paused ? '▶' : 'Ⅱ';
 
-    toast(paused ? 'RACE PAUSED' : 'RACE RESUMED');
-}
-
-function finishRace() {
-    if (finished) return;
-
-    finished = true;
-    started = false;
-
-    clearInput();
-
-    $('final-time').textContent = formatTime(raceTime);
-
-    $('best-time').textContent =
-        'NIGHT CITY CIRCUIT · 3 LAPS COMPLETE';
-
-    $('finish-screen').classList.remove('hidden');
-
-    toast('RACE COMPLETE');
+    toast(paused ? 'DRIVE PAUSED' : 'DRIVE RESUMED');
 }
 
 $('pause-button').addEventListener('click', togglePause);
 
 $('start-button').addEventListener('click', () => {
     $('start-screen').classList.add('hidden');
-
     startAudio();
     startCountdown();
 });
@@ -611,12 +523,10 @@ function animate() {
 
     const delta = Math.min(clock.getDelta(), 0.04);
 
-    if (started && !paused && !finished) {
+    if (started && !paused) {
         raceTime += delta;
 
-        vehicle.update(delta, input, TRACK);
-
-        updateRaceProgress();
+        vehicle.update(delta, input);
 
         smokeTimer += delta;
 
@@ -682,8 +592,7 @@ const loadingTimer = setInterval(() => {
     }
 }, 100);
 
-console.log('NIGHTSHIFT//LITE v1.0');
-console.log('3D WORLD: READY');
+console.log('NIGHTSHIFT//LITE HIGHWAY EDITION');
+console.log('HIGHWAY WORLD: READY');
 console.log('VEHICLE SYSTEM: READY');
-console.log('RACING SYSTEM: READY');
 console.log('NITRO SYSTEM: READY');
