@@ -1,7 +1,7 @@
 
 import * as THREE from 'three';
 
-export function createVehicle(scene) {
+export function createVehicle(scene, track) {
     const car = new THREE.Group();
     scene.add(car);
 
@@ -297,6 +297,7 @@ export function createVehicle(scene) {
     }
 
     car.position.set(track.rx, 0, 0);
+    car.rotation.y = state.yaw;
 
     return {
         car,
