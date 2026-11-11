@@ -61,11 +61,11 @@ export function createVehicle(scene, track) {
         exhausts.push(exhaust);
     }
 
+    const start = track.pointAt(0);
     const state = {
         speed: 0,
-        yaw: 0,
+        yaw: start.yaw,
         lateral: 0,
-        offset: 0,
         progress: 0,
         nitro: 100,
         drifting: false,
@@ -95,30 +95,36 @@ export function createVehicle(scene, track) {
         if (state.boosting) state.nitro = Math.max(0, state.nitro - 27 * delta);
         else state.nitro = Math.min(100, state.nitro + 5 * delta);
 
+        // The track progress is only used to check whether the independently
+        // steered car is still near the road. It no longer sets the car's pose.
         state.progress = THREE.MathUtils.euclideanModulo(
             state.progress + state.speed * delta,
             track.length
         );
-        const road = track.pointAt(state.progress);
+
         const steerPower = THREE.MathUtils.clamp(Math.abs(state.speed) / 11, 0.1, 1);
-        state.yaw = road.yaw - steer * 1.65 * steerPower * Math.sign(state.speed || 1) * delta;
+        state.yaw -= steer * 1.65 * steerPower * Math.sign(state.speed || 1) * delta;
 
         state.lateral += steer * Math.abs(state.speed) * (state.drifting ? 0.48 : 0.14) * delta;
         state.lateral *= Math.exp(-(state.drifting ? 1.35 : 6.8) * delta);
-        state.offset += state.lateral * delta;
 
-        const roadCenterX = road.x;
-        const roadCenterZ = road.z;
-        const rightX = Math.cos(road.yaw);
-        const rightZ = -Math.sin(road.yaw);
-        car.position.set(
-            roadCenterX + rightX * state.offset,
-            0,
-            roadCenterZ + rightZ * state.offset
-        );
+        const forwardX = -Math.sin(state.yaw);
+        const forwardZ = -Math.cos(state.yaw);
+        const rightX = Math.cos(state.yaw);
+        const rightZ = -Math.sin(state.yaw);
+        car.position.x += (forwardX * state.speed + rightX * state.lateral) * delta;
+        car.position.z += (forwardZ * state.speed + rightZ * state.lateral) * delta;
+        car.position.y = 0;
         car.rotation.y = state.yaw;
 
-        const roadOffset = Math.abs(state.offset);
+        // Measure the car's lateral distance from the expected road position,
+        // without pulling or steering it back toward the center.
+        const road = track.pointAt(state.progress);
+        const roadRightX = Math.cos(road.yaw);
+        const roadRightZ = -Math.sin(road.yaw);
+        const offsetX = car.position.x - road.x;
+        const offsetZ = car.position.z - road.z;
+        const roadOffset = Math.abs(offsetX * roadRightX + offsetZ * roadRightZ);
         state.onRoad = roadOffset < track.width / 2 - 1.1;
         if (!state.onRoad) state.speed *= Math.exp(-0.85 * delta);
 
@@ -141,7 +147,6 @@ export function createVehicle(scene, track) {
         return state;
     }
 
-    const start = track.pointAt(0);
     car.position.set(start.x, 0, start.z);
     car.rotation.y = start.yaw;
 
