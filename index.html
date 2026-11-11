@@ -1,0 +1,136 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="theme-color" content="#050711">
+    <title>NIGHTSHIFT//Lite</title>
+    <link rel="stylesheet" href="style.css">
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+        }
+    }
+    </script>
+</head>
+<body>
+
+    <main id="game">
+        <div id="world"></div>
+
+        <div id="loading">
+            <div class="loading-brand">NIGHTSHIFT<span>//LITE</span></div>
+            <div class="loading-track"><div id="loading-fill"></div></div>
+            <p>INITIALIZING NEURAL RACING SYSTEM</p>
+        </div>
+
+        <section id="start-screen" class="screen">
+            <div class="start-content">
+                <div class="eyebrow">NEON RACING DIVISION / 001</div>
+                <h1>NIGHTSHIFT<span>//LITE</span></h1>
+                <p class="subtitle">THE CITY NEVER SLEEPS.</p>
+                <div class="start-line"></div>
+                <div class="start-stats">
+                    <span>01 / NIGHT CITY</span>
+                    <span>03 / LAPS</span>
+                    <span>GT / CLASS</span>
+                </div>
+                <button id="start-button" class="primary-button">
+                    START ENGINE <span>↗</span>
+                </button>
+                <p class="small-note">WASD / ARROWS TO DRIVE · SPACE TO DRIFT · SHIFT TO BOOST</p>
+            </div>
+        </section>
+
+        <section id="finish-screen" class="screen hidden">
+            <div class="finish-content">
+                <div class="eyebrow">RACE COMPLETE</div>
+                <h1>FINISHED<span>.</span></h1>
+                <div id="final-time">00:00.00</div>
+                <p id="best-time">YOUR RACE IS COMPLETE</p>
+                <button id="restart-button" class="primary-button">
+                    RACE AGAIN ↗
+                </button>
+            </div>
+        </section>
+
+        <div id="countdown" class="countdown hidden">3</div>
+
+        <header class="hud-top">
+            <div class="logo">
+                NIGHTSHIFT<span>//LITE</span>
+                <small>NEON RACING DIVISION</small>
+            </div>
+            <div class="top-right">
+                <div class="online"><i></i> SYSTEM ONLINE</div>
+                <button id="pause-button" class="pause-button">Ⅱ</button>
+            </div>
+        </header>
+
+        <section class="race-hud">
+            <div class="hud-card">
+                <label>LAP</label>
+                <strong id="lap">01 <span>/ 03</span></strong>
+            </div>
+            <div class="hud-card">
+                <label>RACE TIME</label>
+                <strong id="timer">00:00.00</strong>
+            </div>
+            <div class="hud-card">
+                <label>CHECKPOINT</label>
+                <strong id="checkpoint">01 <span>/ 04</span></strong>
+            </div>
+        </section>
+
+        <section class="speed-hud">
+            <div class="speed-main">
+                <span id="speed">000</span>
+                <small>KM/H</small>
+            </div>
+            <div class="speed-bar"><div id="speed-fill"></div></div>
+            <div class="speed-meta">
+                <span>GEAR <b id="gear">N</b></span>
+                <span id="driving-mode">SPORT</span>
+            </div>
+            <div class="nitro-box">
+                <div class="nitro-heading">
+                    <span>NITROUS</span>
+                    <span id="nitro-percent">100%</span>
+                </div>
+                <div class="nitro-track"><div id="nitro-fill"></div></div>
+            </div>
+        </section>
+
+        <div class="location-label">
+            <span class="location-dot"></span>
+            NIGHT CITY CIRCUIT <span class="separator">/</span> SECTOR 01
+        </div>
+
+        <div id="minimap-wrap">
+            <canvas id="minimap" width="180" height="140"></canvas>
+            <span>TRACK RADAR</span>
+        </div>
+
+        <section id="touch-controls">
+            <div class="steer-group">
+                <button class="touch-button steer-button" data-control="left">◀</button>
+                <button class="touch-button steer-button" data-control="right">▶</button>
+            </div>
+            <div class="drive-group">
+                <button class="touch-button brake-button" data-control="brake">BRAKE</button>
+                <button class="touch-button drift-button" data-control="drift">DRIFT</button>
+                <button class="touch-button nitro-button" data-control="nitro">N₂O</button>
+                <button class="touch-button gas-button" data-control="gas">GAS</button>
+            </div>
+        </section>
+
+        <div id="toast"></div>
+    </main>
+
+    <script type="module" src="game.js"></script>
+</body>
+</html>
