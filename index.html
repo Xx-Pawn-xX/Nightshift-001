@@ -8,7 +8,6 @@
     <meta name="theme-color" content="#050711">
     <title>NIGHTSHIFT//Lite</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="driving-controls.css">
 
     <script type="importmap">
     {
@@ -37,7 +36,7 @@
                 <button id="start-button" class="primary-button">
                     START ENGINE <span>↗</span>
                 </button>
-                <p class="small-note">TILT TO STEER ON MOBILE · WASD / ARROWS ON DESKTOP · SPACE TO DRIFT · SHIFT TO BOOST</p>
+                <p class="small-note">WASD / ARROWS TO DRIVE · SPACE TO DRIFT · SHIFT TO BOOST</p>
             </div>
         </section>
 
@@ -62,6 +61,7 @@
             </div>
             <div class="top-right">
                 <div class="online"><i></i> SYSTEM ONLINE</div>
+                <button id="auto-steer-button" class="pause-button" type="button" aria-pressed="false" title="Toggle auto-steer (T)">AUTO: OFF</button>
                 <button id="pause-button" class="pause-button">Ⅱ</button>
             </div>
         </header>
@@ -105,39 +105,34 @@
             NIGHT CITY CIRCUIT <span class="separator">/</span> SECTOR 01
         </div>
 
-        <section id="touch-controls" aria-label="Driving controls">
-            <div class="drive-group">
-                <button class="touch-button brake-button" data-control="brake">BRAKE</button>
-                <button class="touch-button drift-button" data-control="drift">DRIFT</button>
-                <button class="touch-button nitro-button" id="nitro-button" type="button" aria-pressed="false">N₂O</button>
-
-                <div class="throttle-control">
-                    <input
-                        id="throttle-slider"
-                        type="range"
-                        min="0"
-                        max="100"
-                        value="0"
-                        step="1"
-                        aria-label="Throttle"
-                    >
-                    <label for="throttle-slider">THROTTLE</label>
-                </div>
-
-                <div class="speed-limit-control">
-                    <label for="speed-limit-slider">MAX SPEED <output id="speed-limit-value" for="speed-limit-slider">358</output></label>
-                    <input id="speed-limit-slider" type="range" min="100" max="700" value="358" step="10" aria-label="Maximum speed in kilometers per hour">
-                    <span>KM/H</span>
-                </div>
-
-                <button class="touch-button orientation-button" id="orientation-button" type="button" aria-pressed="false">TILT: OFF</button>
+        <section id="touch-controls">
+            <div class="steer-group">
+                <button class="touch-button steer-button" data-control="left">◀</button>
+                <button class="touch-button steer-button" data-control="right">▶</button>
             </div>
+            <div class="drive-group">
+    <button class="touch-button brake-button" data-control="brake">BRAKE</button>
+    <button class="touch-button drift-button" data-control="drift">DRIFT</button>
+    <button class="touch-button nitro-button" id="nitro-button" type="button" aria-pressed="false">N₂O</button>
+
+    <div class="throttle-control">
+        <input
+            id="throttle-slider"
+            type="range"
+            min="0"
+            max="100"
+            value="0"
+            step="1"
+            aria-label="Throttle"
+        >
+        <label for="throttle-slider">THROTTLE</label>
+    </div>
+</div>
         </section>
 
         <div id="toast"></div>
     </main>
 
-    <script type="module" src="mobile-controls.js"></script>
     <script type="module" src="game.js"></script>
 </body>
 </html>
