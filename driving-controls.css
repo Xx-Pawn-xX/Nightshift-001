@@ -1,0 +1,67 @@
+/* Mobile tilt steering and configurable speed limiter. */
+.speed-limit-control {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    width: 125px;
+    min-height: 76px;
+    padding: 8px;
+    background: rgba(3, 13, 28, .76);
+    border: 1px solid rgba(0, 200, 255, .3);
+    border-radius: 10px;
+    font: 800 9px Orbitron, sans-serif;
+    color: var(--blue);
+}
+
+.speed-limit-control label {
+    white-space: nowrap;
+}
+
+.speed-limit-control output {
+    color: var(--white);
+    margin-left: 4px;
+}
+
+.speed-limit-control input {
+    width: 100%;
+    accent-color: var(--blue);
+    touch-action: pan-x;
+}
+
+.speed-limit-control > span {
+    color: var(--muted);
+    font-size: 8px;
+}
+
+.orientation-button {
+    min-width: 90px;
+    padding: 0 8px;
+    color: var(--blue);
+}
+
+.orientation-button.active {
+    border-color: #00eaff;
+    box-shadow: 0 0 18px rgba(0, 200, 255, .4);
+}
+
+@media (max-width: 650px) {
+    .drive-group {
+        left: 10px;
+        right: 10px;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .speed-limit-control {
+        width: 105px;
+        padding: 6px;
+    }
+
+    .orientation-button {
+        min-width: 70px;
+        height: 58px;
+        font-size: 9px;
+    }
+}

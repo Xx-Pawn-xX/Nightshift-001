@@ -75,69 +75,32 @@ export function createVehicle(scene, track) {
         distance: 0
     };
 
-    // The highway has a built-in lane centerline, so auto-steer can follow it
-    // directly rather than accumulating steering errors over time.
-    let autoSteerEnabled = false;
-    const autoSteerButton = document.getElementById('auto-steer-button');
-
-    function setAutoSteer(enabled) {
-        autoSteerEnabled = enabled;
-        if (autoSteerButton) {
-            autoSteerButton.textContent = `AUTO: ${enabled ? 'ON' : 'OFF'}`;
-            autoSteerButton.setAttribute('aria-pressed', String(enabled));
-            autoSteerButton.title = `Toggle auto-steer (T) — ${enabled ? 'on' : 'off'}`;
-        }
-    }
-
-    autoSteerButton?.addEventListener('click', () => {
-        setAutoSteer(!autoSteerEnabled);
-    });
-
-    window.addEventListener('keydown', event => {
-        if (event.key.toLowerCase() !== 't' || event.repeat) return;
-        if (event.target instanceof HTMLElement && event.target.isContentEditable) return;
-        setAutoSteer(!autoSteerEnabled);
-    });
-
     function update(delta, input) {
-        const steerInput = autoSteerEnabled
-            ? 0
+        const controls = window.nightshiftControls;
+        const steerInput = controls?.orientationEnabled
+            ? controls.orientationSteer
             : Number(input.right) - Number(input.left);
         state.steer = THREE.MathUtils.damp(state.steer, steerInput, 5, delta);
         const steer = state.steer;
 
-        // Auto-steer controls direction only. The player still has to hold gas;
-        // nitro raises the auto-mode speed cap while it is actively boosting.
         state.boosting = input.nitro && state.nitro > 0 && state.speed > 5;
-        state.drifting = !autoSteerEnabled && input.drift && state.speed > 8;
+        state.drifting = input.drift && state.speed > 8;
         const boostPower = state.boosting ? 1.55 : 1;
-        const throttle = THREE.MathUtils.clamp(
-            input.throttle ?? 0,
-            0,
-            1
-        );
-
+        const throttle = THREE.MathUtils.clamp(input.throttle ?? 0, 0, 1);
         const accelerating = throttle > 0;
         const braking = input.brake;
 
-        if (accelerating) {
-            state.speed += 28 * throttle * boostPower * delta;
-        }
+        if (accelerating) state.speed += 28 * throttle * boostPower * delta;
+        if (braking) state.speed -= (state.speed > 0 ? 45 : 13) * delta;
+        if (!accelerating && !braking) state.speed = THREE.MathUtils.damp(state.speed, 0, 0.75, delta);
 
-        if (braking) {
-            state.speed -= (state.speed > 0 ? 45 : 13) * delta;
-        }
-
-        if (!accelerating && !braking) {
-            state.speed = THREE.MathUtils.damp(state.speed, 0, 0.75, delta);
-        }
-
-        const maxSpeed = autoSteerEnabled
-            ? (state.boosting ? 788 : 695)
-            : (state.boosting ? 360 : 358);
+        const maxSpeed = THREE.MathUtils.clamp(
+            Number(controls?.maxSpeed) || 358,
+            100,
+            700
+        );
         state.speed = THREE.MathUtils.clamp(state.speed, -13, maxSpeed);
 
-        // Reduce consumption to one fifth so a full nitro tank lasts 5x longer.
         if (state.boosting) state.nitro = Math.max(0, state.nitro - 5.4 * delta);
         else state.nitro = Math.min(100, state.nitro + 5 * delta);
 
@@ -147,26 +110,17 @@ export function createVehicle(scene, track) {
         );
 
         const road = track.pointAt(state.progress);
-        if (autoSteerEnabled) {
-            // Snap to the exact highway center and heading each frame. This
-            // prevents drift or accumulated error from carrying the car off-road.
-            state.lateral = 0;
-            state.yaw = road.yaw;
-            car.position.set(road.x, 0, road.z);
-        } else {
-            const steerPower = THREE.MathUtils.clamp(Math.abs(state.speed) / 11, 0.1, 1);
-            state.yaw -= steer * 1.1 * steerPower * Math.sign(state.speed || 1) * delta;
+        const steerPower = THREE.MathUtils.clamp(Math.abs(state.speed) / 11, 0.1, 1);
+        state.yaw -= steer * 1.1 * steerPower * Math.sign(state.speed || 1) * delta;
+        state.lateral += steer * Math.abs(state.speed) * (state.drifting ? 0.32 : 0.09) * delta;
+        state.lateral *= Math.exp(-(state.drifting ? 1.35 : 6.8) * delta);
 
-            state.lateral += steer * Math.abs(state.speed) * (state.drifting ? 0.32 : 0.09) * delta;
-            state.lateral *= Math.exp(-(state.drifting ? 1.35 : 6.8) * delta);
-
-            const forwardX = -Math.sin(state.yaw);
-            const forwardZ = -Math.cos(state.yaw);
-            const rightX = Math.cos(state.yaw);
-            const rightZ = -Math.sin(state.yaw);
-            car.position.x += (forwardX * state.speed + rightX * state.lateral) * delta;
-            car.position.z += (forwardZ * state.speed + rightZ * state.lateral) * delta;
-        }
+        const forwardX = -Math.sin(state.yaw);
+        const forwardZ = -Math.cos(state.yaw);
+        const rightX = Math.cos(state.yaw);
+        const rightZ = -Math.sin(state.yaw);
+        car.position.x += (forwardX * state.speed + rightX * state.lateral) * delta;
+        car.position.z += (forwardZ * state.speed + rightZ * state.lateral) * delta;
 
         car.position.y = 0;
         car.rotation.y = state.yaw;
@@ -176,7 +130,7 @@ export function createVehicle(scene, track) {
         const offsetX = car.position.x - road.x;
         const offsetZ = car.position.z - road.z;
         const roadOffset = Math.abs(offsetX * roadRightX + offsetZ * roadRightZ);
-        state.onRoad = autoSteerEnabled || roadOffset < track.width / 2 - 1.1;
+        state.onRoad = roadOffset < track.width / 2 - 1.1;
         if (!state.onRoad) state.speed *= Math.exp(-0.85 * delta);
 
         car.rotation.z = THREE.MathUtils.damp(
@@ -209,7 +163,6 @@ export function createVehicle(scene, track) {
         get nitro() { return state.nitro; },
         get onRoad() { return state.onRoad; },
         get drifting() { return state.drifting; },
-        get boosting() { return state.boosting; },
-        get autoSteer() { return autoSteerEnabled; }
+        get boosting() { return state.boosting; }
     };
 }
