@@ -137,7 +137,8 @@ export function createVehicle(scene, track) {
             : (state.boosting ? 360 : 358);
         state.speed = THREE.MathUtils.clamp(state.speed, -13, maxSpeed);
 
-        if (state.boosting) state.nitro = Math.max(0, state.nitro - 27 * delta);
+        // Reduce consumption to one fifth so a full nitro tank lasts 5x longer.
+        if (state.boosting) state.nitro = Math.max(0, state.nitro - 5.4 * delta);
         else state.nitro = Math.min(100, state.nitro + 5 * delta);
 
         state.progress = THREE.MathUtils.euclideanModulo(
